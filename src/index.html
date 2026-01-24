@@ -1,0 +1,1301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:;">
+  <title>SF Org Describe</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-primary: #0f0f1a;
+      --bg-secondary: #1a1a2e;
+      --bg-tertiary: #252542;
+      --accent-primary: #4f46e5;
+      --accent-hover: #6366f1;
+      --accent-success: #10b981;
+      --accent-warning: #f59e0b;
+      --accent-danger: #ef4444;
+      --text-primary: #f1f5f9;
+      --text-secondary: #94a3b8;
+      --text-muted: #64748b;
+      --border-color: #334155;
+      --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    /* App layout */
+    .app-container {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+    }
+
+    /* Header */
+    .header {
+      background: var(--bg-secondary);
+      padding: 16px 24px;
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      -webkit-app-region: drag;
+    }
+
+    .header h1 {
+      font-size: 20px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .header h1 svg {
+      width: 28px;
+      height: 28px;
+    }
+
+    .connection-status {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      -webkit-app-region: no-drag;
+    }
+
+    .status-indicator {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 16px;
+      background: var(--bg-tertiary);
+      border-radius: 8px;
+      font-size: 14px;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--accent-danger);
+    }
+
+    .status-dot.connected {
+      background: var(--accent-success);
+    }
+
+    /* Main content */
+    .main-content {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    /* Sidebar */
+    .sidebar {
+      width: 320px;
+      background: var(--bg-secondary);
+      border-right: 1px solid var(--border-color);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .sidebar-header {
+      padding: 16px;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .search-box {
+      width: 100%;
+      padding: 10px 14px;
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      color: var(--text-primary);
+      font-size: 14px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .search-box:focus {
+      border-color: var(--accent-primary);
+    }
+
+    .search-box::placeholder {
+      color: var(--text-muted);
+    }
+
+    .object-filters {
+      display: flex;
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .filter-btn {
+      flex: 1;
+      padding: 8px;
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      color: var(--text-secondary);
+      font-size: 12px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .filter-btn:hover {
+      background: var(--bg-primary);
+    }
+
+    .filter-btn.active {
+      background: var(--accent-primary);
+      border-color: var(--accent-primary);
+      color: white;
+    }
+
+    .object-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 8px;
+    }
+
+    .object-item {
+      display: flex;
+      align-items: center;
+      padding: 10px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background 0.2s;
+      gap: 10px;
+    }
+
+    .object-item:hover {
+      background: var(--bg-tertiary);
+    }
+
+    .object-item.selected {
+      background: var(--accent-primary);
+    }
+
+    .object-item input[type="checkbox"] {
+      width: 16px;
+      height: 16px;
+      accent-color: var(--accent-primary);
+    }
+
+    .object-info {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .object-name {
+      font-size: 14px;
+      font-weight: 500;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .object-api-name {
+      font-size: 12px;
+      color: var(--text-muted);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .object-badge {
+      font-size: 10px;
+      padding: 2px 6px;
+      background: var(--accent-warning);
+      color: var(--bg-primary);
+      border-radius: 4px;
+      font-weight: 600;
+    }
+
+    .sidebar-footer {
+      padding: 16px;
+      border-top: 1px solid var(--border-color);
+      background: var(--bg-tertiary);
+    }
+
+    .selected-count {
+      font-size: 14px;
+      color: var(--text-secondary);
+      margin-bottom: 12px;
+    }
+
+    .selected-count strong {
+      color: var(--accent-primary);
+    }
+
+    /* Content area */
+    .content-area {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* Tabs */
+    .tabs {
+      display: flex;
+      background: var(--bg-secondary);
+      border-bottom: 1px solid var(--border-color);
+      padding: 0 16px;
+    }
+
+    .tab {
+      padding: 16px 24px;
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--text-secondary);
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      transition: all 0.2s;
+    }
+
+    .tab:hover {
+      color: var(--text-primary);
+    }
+
+    .tab.active {
+      color: var(--accent-primary);
+      border-bottom-color: var(--accent-primary);
+    }
+
+    /* Tab content */
+    .tab-content {
+      flex: 1;
+      overflow: hidden;
+      display: none;
+    }
+
+    .tab-content.active {
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Connection panel */
+    .connection-panel {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      padding: 40px;
+      text-align: center;
+    }
+
+    .connection-panel h2 {
+      font-size: 24px;
+      margin-bottom: 12px;
+    }
+
+    .connection-panel p {
+      color: var(--text-secondary);
+      margin-bottom: 32px;
+      max-width: 400px;
+    }
+
+    .env-selector {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+
+    .env-btn {
+      padding: 12px 24px;
+      background: var(--bg-tertiary);
+      border: 2px solid var(--border-color);
+      border-radius: 8px;
+      color: var(--text-primary);
+      font-size: 14px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .env-btn:hover {
+      border-color: var(--accent-primary);
+    }
+
+    .env-btn.selected {
+      border-color: var(--accent-primary);
+      background: rgba(79, 70, 229, 0.1);
+    }
+
+    .connect-btn {
+      padding: 14px 32px;
+      background: var(--accent-primary);
+      border: none;
+      border-radius: 8px;
+      color: white;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .connect-btn:hover {
+      background: var(--accent-hover);
+    }
+
+    .connect-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .disconnect-btn {
+      padding: 10px 20px;
+      background: transparent;
+      border: 1px solid var(--accent-danger);
+      border-radius: 6px;
+      color: var(--accent-danger);
+      font-size: 14px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .disconnect-btn:hover {
+      background: var(--accent-danger);
+      color: white;
+    }
+
+    /* Device flow UI */
+    .device-flow-info {
+      background: var(--bg-tertiary);
+      padding: 24px;
+      border-radius: 12px;
+      margin-top: 24px;
+      max-width: 400px;
+    }
+
+    .device-flow-info h3 {
+      font-size: 16px;
+      margin-bottom: 16px;
+    }
+
+    .user-code {
+      font-family: monospace;
+      font-size: 32px;
+      letter-spacing: 4px;
+      color: var(--accent-primary);
+      background: var(--bg-primary);
+      padding: 16px 24px;
+      border-radius: 8px;
+      margin: 16px 0;
+    }
+
+    .device-flow-info p {
+      font-size: 14px;
+      color: var(--text-secondary);
+      margin-bottom: 16px;
+    }
+
+    .open-browser-btn {
+      padding: 12px 24px;
+      background: var(--accent-success);
+      border: none;
+      border-radius: 8px;
+      color: white;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .open-browser-btn:hover {
+      background: #059669;
+    }
+
+    /* Export panel */
+    .export-panel {
+      padding: 24px;
+      overflow-y: auto;
+    }
+
+    .export-section {
+      background: var(--bg-secondary);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+    }
+
+    .export-section h3 {
+      font-size: 18px;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .export-section p {
+      color: var(--text-secondary);
+      font-size: 14px;
+      margin-bottom: 20px;
+    }
+
+    .export-btn {
+      padding: 12px 24px;
+      background: var(--accent-primary);
+      border: none;
+      border-radius: 8px;
+      color: white;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .export-btn:hover {
+      background: var(--accent-hover);
+    }
+
+    .export-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    /* ERD panel */
+    .erd-controls {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+    }
+
+    .depth-control {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .depth-control label {
+      font-size: 14px;
+      color: var(--text-secondary);
+    }
+
+    .depth-control input {
+      width: 60px;
+      padding: 8px;
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      color: var(--text-primary);
+      font-size: 14px;
+      text-align: center;
+    }
+
+    /* ERD Preview */
+    .erd-preview-container {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      background: var(--bg-secondary);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+
+    .erd-preview-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 16px;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .erd-preview-header h4 {
+      font-size: 14px;
+      font-weight: 500;
+    }
+
+    .erd-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    .erd-action-btn {
+      padding: 8px 16px;
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      color: var(--text-primary);
+      font-size: 13px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .erd-action-btn:hover {
+      background: var(--bg-primary);
+      border-color: var(--accent-primary);
+    }
+
+    .erd-preview {
+      flex: 1;
+      display: flex;
+      overflow: hidden;
+    }
+
+    .mermaid-preview {
+      flex: 1;
+      background: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: auto;
+      padding: 20px;
+    }
+
+    .mermaid-preview svg {
+      max-width: 100%;
+      height: auto;
+    }
+
+    .mermaid-code {
+      flex: 1;
+      background: var(--bg-primary);
+      border-left: 1px solid var(--border-color);
+      overflow: auto;
+    }
+
+    .mermaid-code pre {
+      padding: 16px;
+      font-family: 'Monaco', 'Menlo', monospace;
+      font-size: 13px;
+      line-height: 1.5;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    /* Loading states */
+    .loading-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(15, 15, 26, 0.8);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      display: none;
+    }
+
+    .loading-overlay.visible {
+      display: flex;
+    }
+
+    .spinner {
+      width: 48px;
+      height: 48px;
+      border: 4px solid var(--border-color);
+      border-top-color: var(--accent-primary);
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .loading-text {
+      margin-top: 16px;
+      font-size: 16px;
+      color: var(--text-secondary);
+    }
+
+    /* Toast notifications */
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      padding: 16px 24px;
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+      z-index: 1001;
+      transform: translateY(100px);
+      opacity: 0;
+      transition: all 0.3s;
+    }
+
+    .toast.visible {
+      transform: translateY(0);
+      opacity: 1;
+    }
+
+    .toast.success {
+      border-color: var(--accent-success);
+    }
+
+    .toast.error {
+      border-color: var(--accent-danger);
+    }
+
+    /* Empty states */
+    .empty-state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      color: var(--text-muted);
+      text-align: center;
+      padding: 40px;
+    }
+
+    .empty-state svg {
+      width: 64px;
+      height: 64px;
+      margin-bottom: 16px;
+      opacity: 0.5;
+    }
+
+    .empty-state h3 {
+      font-size: 18px;
+      margin-bottom: 8px;
+      color: var(--text-secondary);
+    }
+
+    /* Scrollbar styling */
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: var(--bg-primary);
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: var(--border-color);
+      border-radius: 4px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: var(--text-muted);
+    }
+
+    /* Utility */
+    .hidden {
+      display: none !important;
+    }
+  </style>
+</head>
+<body>
+  <div class="app-container">
+    <!-- Header -->
+    <header class="header">
+      <h1>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M4 7v10c0 2 1 3 3 3h10c2 0 3-1 3-3V7c0-2-1-3-3-3H7c-2 0-3 1-3 3z"/>
+          <path d="M9 12h6M12 9v6"/>
+        </svg>
+        SF Org Describe
+      </h1>
+      <div class="connection-status">
+        <div class="status-indicator">
+          <span class="status-dot" id="statusDot"></span>
+          <span id="statusText">Not Connected</span>
+        </div>
+        <button class="disconnect-btn hidden" id="disconnectBtn">Disconnect</button>
+      </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main-content">
+      <!-- Sidebar - Object List -->
+      <aside class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+          <input type="text" class="search-box" id="searchBox" placeholder="Search objects...">
+          <div class="object-filters">
+            <button class="filter-btn active" data-filter="all">All</button>
+            <button class="filter-btn" data-filter="standard">Standard</button>
+            <button class="filter-btn" data-filter="custom">Custom</button>
+          </div>
+        </div>
+        <div class="object-list" id="objectList">
+          <div class="empty-state">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"/>
+              <path d="M12 6v6l4 2"/>
+            </svg>
+            <h3>Connect to an Org</h3>
+            <p>Connect to a Salesforce org to view available objects</p>
+          </div>
+        </div>
+        <div class="sidebar-footer hidden" id="sidebarFooter">
+          <div class="selected-count">
+            <strong id="selectedCount">0</strong> objects selected
+          </div>
+        </div>
+      </aside>
+
+      <!-- Content Area -->
+      <div class="content-area">
+        <!-- Tabs -->
+        <div class="tabs">
+          <div class="tab active" data-tab="connect">Connect</div>
+          <div class="tab" data-tab="export">Excel Export</div>
+          <div class="tab" data-tab="erd">ERD Generator</div>
+        </div>
+
+        <!-- Connect Tab -->
+        <div class="tab-content active" id="tab-connect">
+          <div class="connection-panel" id="connectionPanel">
+            <h2>Connect to Salesforce</h2>
+            <p>Connect to any Salesforce org using OAuth. No Connected App setup required - uses the same authentication method as Salesforce Data Loader.</p>
+
+            <div class="env-selector">
+              <button class="env-btn selected" data-env="https://login.salesforce.com">Production</button>
+              <button class="env-btn" data-env="https://test.salesforce.com">Sandbox</button>
+            </div>
+
+            <button class="connect-btn" id="connectBtn">Connect to Salesforce</button>
+
+            <div class="device-flow-info hidden" id="deviceFlowInfo">
+              <h3>Complete Authentication</h3>
+              <p>Enter this code on the Salesforce login page:</p>
+              <div class="user-code" id="userCode">--------</div>
+              <p>Click the button below to open the login page in your browser.</p>
+              <button class="open-browser-btn" id="openBrowserBtn">Open Salesforce Login</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Export Tab -->
+        <div class="tab-content" id="tab-export">
+          <div class="export-panel">
+            <div class="export-section">
+              <h3>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                  <polyline points="14,2 14,8 20,8"/>
+                  <line x1="16" y1="13" x2="8" y2="13"/>
+                  <line x1="16" y1="17" x2="8" y2="17"/>
+                </svg>
+                Export to Excel
+              </h3>
+              <p>Generate a comprehensive Excel workbook with full metadata for each selected object. Each object gets its own tab with field details, picklist values, formulas, and more.</p>
+
+              <div id="exportStatus" style="margin-bottom: 16px;">
+                Select objects from the sidebar to export.
+              </div>
+
+              <button class="export-btn" id="exportExcelBtn" disabled>Export Selected Objects</button>
+            </div>
+
+            <div class="export-section">
+              <h3>What's Included</h3>
+              <ul style="color: var(--text-secondary); font-size: 14px; line-height: 2; padding-left: 20px;">
+                <li>Object summary (API name, label, key prefix, capabilities)</li>
+                <li>All fields with complete metadata</li>
+                <li>Field types, lengths, precision, and scale</li>
+                <li>Required, unique, and external ID flags</li>
+                <li>Picklist values (active values with defaults marked)</li>
+                <li>Formula field definitions</li>
+                <li>Help text and descriptions</li>
+                <li>Relationship details (lookup/master-detail)</li>
+                <li>Field-level security indicators</li>
+                <li>History tracking and encryption status</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <!-- ERD Tab -->
+        <div class="tab-content" id="tab-erd">
+          <div class="export-panel" style="display: flex; flex-direction: column; height: 100%;">
+            <div class="export-section" style="flex-shrink: 0;">
+              <h3>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <rect x="3" y="3" width="7" height="7"/>
+                  <rect x="14" y="3" width="7" height="7"/>
+                  <rect x="14" y="14" width="7" height="7"/>
+                  <rect x="3" y="14" width="7" height="7"/>
+                  <path d="M10 6.5h4M10 17.5h4M6.5 10v4M17.5 10v4"/>
+                </svg>
+                Entity Relationship Diagram
+              </h3>
+              <p>Generate a Mermaid ERD showing relationships between objects. Set the depth to control how many levels of related objects to include.</p>
+
+              <div class="erd-controls">
+                <div class="depth-control">
+                  <label>Relationship Depth:</label>
+                  <input type="number" id="erdDepth" value="2" min="1" max="5">
+                </div>
+                <button class="export-btn" id="generateErdBtn" disabled>Generate ERD</button>
+              </div>
+            </div>
+
+            <div class="erd-preview-container" id="erdPreviewContainer" style="flex: 1; min-height: 400px;">
+              <div class="erd-preview-header">
+                <h4>ERD Preview</h4>
+                <div class="erd-actions">
+                  <button class="erd-action-btn" id="copyMermaidBtn" disabled>Copy Code</button>
+                  <button class="erd-action-btn" id="saveMermaidBtn" disabled>Save as Markdown</button>
+                </div>
+              </div>
+              <div class="erd-preview">
+                <div class="mermaid-preview" id="mermaidPreview">
+                  <div class="empty-state">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <rect x="3" y="3" width="7" height="7"/>
+                      <rect x="14" y="3" width="7" height="7"/>
+                      <rect x="14" y="14" width="7" height="7"/>
+                      <path d="M10 6.5h4M17.5 10v4"/>
+                    </svg>
+                    <h3>No ERD Generated</h3>
+                    <p>Select objects and click "Generate ERD" to create a diagram</p>
+                  </div>
+                </div>
+                <div class="mermaid-code" id="mermaidCode">
+                  <pre id="mermaidCodePre">// Mermaid code will appear here</pre>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Loading Overlay -->
+  <div class="loading-overlay" id="loadingOverlay">
+    <div class="spinner"></div>
+    <div class="loading-text" id="loadingText">Loading...</div>
+  </div>
+
+  <!-- Toast -->
+  <div class="toast" id="toast"></div>
+
+  <!-- Mermaid library -->
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+
+  <script>
+    // Initialize Mermaid
+    mermaid.initialize({
+      startOnLoad: false,
+      theme: 'default',
+      securityLevel: 'loose',
+      er: {
+        layoutDirection: 'TB',
+        minEntityWidth: 100,
+        minEntityHeight: 75,
+        entityPadding: 15,
+        useMaxWidth: false
+      }
+    });
+
+    // State
+    let selectedLoginUrl = 'https://login.salesforce.com';
+    let deviceCode = null;
+    let pollInterval = null;
+    let allObjects = [];
+    let selectedObjects = new Set();
+    let currentFilter = 'all';
+    let currentMermaidCode = '';
+
+    // DOM Elements
+    const statusDot = document.getElementById('statusDot');
+    const statusText = document.getElementById('statusText');
+    const disconnectBtn = document.getElementById('disconnectBtn');
+    const connectBtn = document.getElementById('connectBtn');
+    const deviceFlowInfo = document.getElementById('deviceFlowInfo');
+    const userCodeEl = document.getElementById('userCode');
+    const openBrowserBtn = document.getElementById('openBrowserBtn');
+    const searchBox = document.getElementById('searchBox');
+    const objectList = document.getElementById('objectList');
+    const sidebarFooter = document.getElementById('sidebarFooter');
+    const selectedCountEl = document.getElementById('selectedCount');
+    const exportExcelBtn = document.getElementById('exportExcelBtn');
+    const generateErdBtn = document.getElementById('generateErdBtn');
+    const erdDepthInput = document.getElementById('erdDepth');
+    const mermaidPreview = document.getElementById('mermaidPreview');
+    const mermaidCodePre = document.getElementById('mermaidCodePre');
+    const copyMermaidBtn = document.getElementById('copyMermaidBtn');
+    const saveMermaidBtn = document.getElementById('saveMermaidBtn');
+    const loadingOverlay = document.getElementById('loadingOverlay');
+    const loadingText = document.getElementById('loadingText');
+    const toast = document.getElementById('toast');
+
+    // Tab switching
+    document.querySelectorAll('.tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+        tab.classList.add('active');
+        document.getElementById('tab-' + tab.dataset.tab).classList.add('active');
+      });
+    });
+
+    // Environment selector
+    document.querySelectorAll('.env-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.env-btn').forEach(b => b.classList.remove('selected'));
+        btn.classList.add('selected');
+        selectedLoginUrl = btn.dataset.env;
+      });
+    });
+
+    // Filter buttons
+    document.querySelectorAll('.filter-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        currentFilter = btn.dataset.filter;
+        renderObjectList();
+      });
+    });
+
+    // Connect button
+    connectBtn.addEventListener('click', startAuth);
+
+    // Disconnect button
+    disconnectBtn.addEventListener('click', async () => {
+      await window.api.disconnect();
+      updateConnectionStatus(false);
+      allObjects = [];
+      selectedObjects.clear();
+      renderObjectList();
+      updateSelectedCount();
+    });
+
+    // Open browser button
+    openBrowserBtn.addEventListener('click', () => {
+      const verificationUri = openBrowserBtn.dataset.uri;
+      if (verificationUri) {
+        window.api.openExternal(verificationUri);
+      }
+    });
+
+    // Search
+    searchBox.addEventListener('input', () => {
+      renderObjectList();
+    });
+
+    // Export Excel
+    exportExcelBtn.addEventListener('click', exportToExcel);
+
+    // Generate ERD
+    generateErdBtn.addEventListener('click', generateERD);
+
+    // Copy Mermaid code
+    copyMermaidBtn.addEventListener('click', () => {
+      navigator.clipboard.writeText(currentMermaidCode);
+      showToast('Mermaid code copied to clipboard', 'success');
+    });
+
+    // Save Mermaid file
+    saveMermaidBtn.addEventListener('click', async () => {
+      const result = await window.api.exportMermaid(currentMermaidCode);
+      if (result.success) {
+        showToast('Saved to ' + result.filePath, 'success');
+      } else if (!result.cancelled) {
+        showToast('Failed to save: ' + result.error, 'error');
+      }
+    });
+
+    // Start authentication
+    async function startAuth() {
+      showLoading('Starting authentication...');
+      connectBtn.disabled = true;
+
+      try {
+        const result = await window.api.startDeviceFlow(selectedLoginUrl);
+
+        if (result.success) {
+          deviceCode = result.data.deviceCode;
+          userCodeEl.textContent = result.data.userCode;
+          openBrowserBtn.dataset.uri = result.data.verificationUri;
+          deviceFlowInfo.classList.remove('hidden');
+          connectBtn.classList.add('hidden');
+
+          // Start polling
+          startPolling(result.data.interval);
+        } else {
+          showToast('Failed to start auth: ' + result.error, 'error');
+          connectBtn.disabled = false;
+        }
+      } catch (error) {
+        showToast('Error: ' + error.message, 'error');
+        connectBtn.disabled = false;
+      }
+
+      hideLoading();
+    }
+
+    // Poll for auth completion
+    function startPolling(interval) {
+      pollInterval = setInterval(async () => {
+        try {
+          const result = await window.api.pollDeviceFlow(deviceCode, selectedLoginUrl);
+
+          if (result.success) {
+            // Auth successful!
+            clearInterval(pollInterval);
+            deviceFlowInfo.classList.add('hidden');
+            connectBtn.classList.remove('hidden');
+            connectBtn.disabled = false;
+
+            updateConnectionStatus(true, result.data);
+            loadObjects();
+          } else if (!result.pending) {
+            // Error (not just pending)
+            clearInterval(pollInterval);
+            showToast('Auth failed: ' + result.error, 'error');
+            deviceFlowInfo.classList.add('hidden');
+            connectBtn.classList.remove('hidden');
+            connectBtn.disabled = false;
+          }
+          // If pending, just continue polling
+        } catch (error) {
+          clearInterval(pollInterval);
+          showToast('Error: ' + error.message, 'error');
+        }
+      }, (interval || 5) * 1000);
+    }
+
+    // Update connection status UI
+    function updateConnectionStatus(connected, orgInfo = null) {
+      if (connected && orgInfo) {
+        statusDot.classList.add('connected');
+        statusText.textContent = orgInfo.username;
+        disconnectBtn.classList.remove('hidden');
+
+        // Switch to export tab
+        document.querySelector('.tab[data-tab="export"]').click();
+      } else {
+        statusDot.classList.remove('connected');
+        statusText.textContent = 'Not Connected';
+        disconnectBtn.classList.add('hidden');
+      }
+    }
+
+    // Load objects
+    async function loadObjects() {
+      showLoading('Loading objects...');
+
+      try {
+        const result = await window.api.getObjects();
+
+        if (result.success) {
+          allObjects = result.data;
+          renderObjectList();
+          sidebarFooter.classList.remove('hidden');
+        } else {
+          showToast('Failed to load objects: ' + result.error, 'error');
+        }
+      } catch (error) {
+        showToast('Error: ' + error.message, 'error');
+      }
+
+      hideLoading();
+    }
+
+    // Render object list
+    function renderObjectList() {
+      const searchTerm = searchBox.value.toLowerCase();
+
+      let filtered = allObjects.filter(obj => {
+        // Filter by type
+        if (currentFilter === 'standard' && obj.custom) return false;
+        if (currentFilter === 'custom' && !obj.custom) return false;
+
+        // Filter by search
+        if (searchTerm) {
+          return obj.name.toLowerCase().includes(searchTerm) ||
+                 obj.label.toLowerCase().includes(searchTerm);
+        }
+
+        return true;
+      });
+
+      if (filtered.length === 0) {
+        objectList.innerHTML = `
+          <div class="empty-state">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="11" cy="11" r="8"/>
+              <path d="M21 21l-4.35-4.35"/>
+            </svg>
+            <h3>No Objects Found</h3>
+            <p>Try adjusting your search or filters</p>
+          </div>
+        `;
+        return;
+      }
+
+      objectList.innerHTML = filtered.map(obj => `
+        <div class="object-item ${selectedObjects.has(obj.name) ? 'selected' : ''}" data-name="${obj.name}">
+          <input type="checkbox" ${selectedObjects.has(obj.name) ? 'checked' : ''}>
+          <div class="object-info">
+            <div class="object-name">${obj.label}</div>
+            <div class="object-api-name">${obj.name}</div>
+          </div>
+          ${obj.custom ? '<span class="object-badge">Custom</span>' : ''}
+        </div>
+      `).join('');
+
+      // Add click handlers
+      objectList.querySelectorAll('.object-item').forEach(item => {
+        item.addEventListener('click', (e) => {
+          const name = item.dataset.name;
+          const checkbox = item.querySelector('input[type="checkbox"]');
+
+          if (selectedObjects.has(name)) {
+            selectedObjects.delete(name);
+            item.classList.remove('selected');
+            checkbox.checked = false;
+          } else {
+            selectedObjects.add(name);
+            item.classList.add('selected');
+            checkbox.checked = true;
+          }
+
+          updateSelectedCount();
+        });
+      });
+    }
+
+    // Update selected count
+    function updateSelectedCount() {
+      const count = selectedObjects.size;
+      selectedCountEl.textContent = count;
+
+      exportExcelBtn.disabled = count === 0;
+      generateErdBtn.disabled = count === 0;
+
+      document.getElementById('exportStatus').textContent =
+        count === 0 ? 'Select objects from the sidebar to export.' :
+        `${count} object${count === 1 ? '' : 's'} selected for export.`;
+    }
+
+    // Export to Excel
+    async function exportToExcel() {
+      if (selectedObjects.size === 0) {
+        showToast('Please select at least one object', 'error');
+        return;
+      }
+
+      showLoading('Fetching object metadata...');
+
+      try {
+        // First, describe all selected objects
+        const descResult = await window.api.describeObjects(Array.from(selectedObjects));
+
+        if (!descResult.success) {
+          throw new Error(descResult.error);
+        }
+
+        showLoading('Generating Excel file...');
+
+        // Export to Excel
+        const exportResult = await window.api.exportToExcel(descResult.data);
+
+        if (exportResult.success) {
+          showToast('Excel file saved successfully!', 'success');
+        } else if (!exportResult.cancelled) {
+          throw new Error(exportResult.error);
+        }
+      } catch (error) {
+        showToast('Export failed: ' + error.message, 'error');
+      }
+
+      hideLoading();
+    }
+
+    // Generate ERD
+    async function generateERD() {
+      if (selectedObjects.size === 0) {
+        showToast('Please select at least one object', 'error');
+        return;
+      }
+
+      const depth = parseInt(erdDepthInput.value) || 2;
+      showLoading('Generating ERD (this may take a moment)...');
+
+      try {
+        const result = await window.api.generateERD(Array.from(selectedObjects), depth);
+
+        if (result.success) {
+          currentMermaidCode = result.data.mermaidCode;
+          mermaidCodePre.textContent = currentMermaidCode;
+
+          // Render Mermaid diagram
+          try {
+            const { svg } = await mermaid.render('erd-diagram', currentMermaidCode);
+            mermaidPreview.innerHTML = svg;
+          } catch (renderError) {
+            mermaidPreview.innerHTML = `
+              <div class="empty-state">
+                <h3>Render Error</h3>
+                <p>Could not render diagram. The Mermaid code is available on the right.</p>
+              </div>
+            `;
+          }
+
+          copyMermaidBtn.disabled = false;
+          saveMermaidBtn.disabled = false;
+
+          showToast(`ERD generated with ${result.data.objectsIncluded.length} objects`, 'success');
+        } else {
+          throw new Error(result.error);
+        }
+      } catch (error) {
+        showToast('ERD generation failed: ' + error.message, 'error');
+      }
+
+      hideLoading();
+    }
+
+    // Loading helpers
+    function showLoading(text) {
+      loadingText.textContent = text;
+      loadingOverlay.classList.add('visible');
+    }
+
+    function hideLoading() {
+      loadingOverlay.classList.remove('visible');
+    }
+
+    // Toast helper
+    function showToast(message, type = 'info') {
+      toast.textContent = message;
+      toast.className = 'toast ' + type;
+      toast.classList.add('visible');
+
+      setTimeout(() => {
+        toast.classList.remove('visible');
+      }, 4000);
+    }
+
+    // Check initial connection status
+    async function init() {
+      const status = await window.api.getAuthStatus();
+      if (status.connected) {
+        updateConnectionStatus(true, status.orgInfo);
+        loadObjects();
+      }
+    }
+
+    init();
+  </script>
+</body>
+</html>

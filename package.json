@@ -1,0 +1,83 @@
+{
+  "name": "sf-org-describe",
+  "version": "1.0.0",
+  "description": "Salesforce Org Documentation Tool - Generate Excel metadata exports and ERD diagrams",
+  "main": "src/main.js",
+  "scripts": {
+    "start": "unset ELECTRON_RUN_AS_NODE && electron .",
+    "pack": "electron-builder --dir",
+    "dist": "electron-builder",
+    "dist:mac": "electron-builder --mac",
+    "dist:win": "electron-builder --win",
+    "dist:all": "electron-builder --mac --win"
+  },
+  "keywords": [
+    "salesforce",
+    "metadata",
+    "erd",
+    "documentation"
+  ],
+  "author": "",
+  "license": "MIT",
+  "type": "commonjs",
+  "dependencies": {
+    "dotenv": "^17.2.3",
+    "electron-builder": "^26.4.0",
+    "exceljs": "^4.4.0",
+    "jsforce": "^3.10.13",
+    "open": "^11.0.0"
+  },
+  "build": {
+    "appId": "com.sforgdescribe.app",
+    "productName": "SF Org Describe",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "src/**/*",
+      "package.json"
+    ],
+    "mac": {
+      "category": "public.app-category.developer-tools",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
+      ]
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
+  },
+  "devDependencies": {
+    "electron": "^40.0.0"
+  }
+}
