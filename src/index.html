@@ -649,6 +649,10 @@
       border-color: var(--accent-danger);
     }
 
+    .toast.warning {
+      border-color: var(--accent-warning);
+    }
+
     /* Empty states */
     .empty-state {
       display: flex;
@@ -842,8 +846,8 @@
                   <input type="number" id="erdDepth" value="2" min="1" max="5">
                 </div>
                 <div class="depth-control">
-                  <label>Max Objects:</label>
-                  <input type="number" id="erdMaxObjects" value="25" min="5" max="50">
+                  <label>Max Objects (0=unlimited):</label>
+                  <input type="number" id="erdMaxObjects" value="0" min="0" max="500">
                 </div>
                 <div class="depth-control" style="gap: 4px;">
                   <input type="checkbox" id="erdCompact" style="width: 18px; height: 18px;">
@@ -857,6 +861,7 @@
               <div class="erd-preview-header">
                 <h4>ERD Preview</h4>
                 <div class="erd-actions">
+                  <button class="erd-action-btn" id="openMermaidLiveBtn" disabled>Open in Mermaid Live</button>
                   <button class="erd-action-btn" id="copyMermaidBtn" disabled>Copy Code</button>
                   <button class="erd-action-btn" id="saveMermaidBtn" disabled>Save as Markdown</button>
                 </div>
@@ -1009,6 +1014,17 @@
     copyMermaidBtn.addEventListener('click', () => {
       navigator.clipboard.writeText(currentMermaidCode);
       showToast('Mermaid code copied to clipboard', 'success');
+    });
+
+    // Open in Mermaid Live
+    document.getElementById('openMermaidLiveBtn').addEventListener('click', () => {
+      // Encode the mermaid code for URL
+      const encoded = btoa(encodeURIComponent(currentMermaidCode));
+      const url = `https://mermaid.live/edit#pako:${encoded}`;
+      // For large diagrams, just copy to clipboard and open the site
+      navigator.clipboard.writeText(currentMermaidCode);
+      window.api.openExternal('https://mermaid.live/edit');
+      showToast('Code copied! Paste it in Mermaid Live editor', 'success');
     });
 
     // Save Mermaid file
@@ -1237,7 +1253,8 @@
       }
 
       const depth = parseInt(erdDepthInput.value) || 2;
-      const maxObjects = parseInt(document.getElementById('erdMaxObjects').value) || 25;
+      const maxObjectsInput = parseInt(document.getElementById('erdMaxObjects').value);
+      const maxObjects = maxObjectsInput > 0 ? maxObjectsInput : null; // 0 or empty = unlimited
       const compact = document.getElementById('erdCompact').checked;
 
       showLoading('Generating ERD (this may take a moment)...');
@@ -1262,14 +1279,19 @@
             `;
           }
 
+          document.getElementById('openMermaidLiveBtn').disabled = false;
           copyMermaidBtn.disabled = false;
           saveMermaidBtn.disabled = false;
 
-          let message = `ERD generated with ${result.data.objectsIncluded.length} objects`;
+          let message = `ERD generated with ${result.data.objectsIncluded.length} objects, ${result.data.relationshipCount} relationships`;
           if (result.data.truncated) {
-            message += ' (truncated - try reducing depth or max objects)';
+            message += ' (truncated)';
           }
-          showToast(message, 'success');
+          if (result.data.mayExceedBrowserLimit) {
+            showToast(message + '. Large diagram - use "Open in Mermaid Live" for best viewing', 'warning');
+          } else {
+            showToast(message, 'success');
+          }
         } else {
           throw new Error(result.error);
         }

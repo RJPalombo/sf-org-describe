@@ -2,10 +2,13 @@
  * ERD Generator - Creates Mermaid diagrams from Salesforce object relationships
  */
 
-// Limits to prevent Mermaid from exceeding max text size
-const MAX_OBJECTS = 30;
-const MAX_RELATIONSHIPS = 100;
-const MAX_FIELDS_PER_OBJECT = 8;
+// Default limits (recommendations, not hard limits)
+const DEFAULT_MAX_OBJECTS = 30;
+const DEFAULT_MAX_FIELDS_PER_OBJECT = 8;
+
+// Warning thresholds - above these, browser rendering may fail
+const WARN_OBJECTS = 40;
+const WARN_RELATIONSHIPS = 150;
 
 /**
  * Generate ERD for selected objects with configurable depth
@@ -16,8 +19,9 @@ const MAX_FIELDS_PER_OBJECT = 8;
  * @returns {Object} - { mermaidCode, objectsIncluded, relationships, truncated }
  */
 async function generateERD(salesforce, rootObjects, maxDepth = 2, options = {}) {
-  const maxObjects = options.maxObjects || MAX_OBJECTS;
+  const maxObjects = options.maxObjects || null; // null = no limit
   const compact = options.compact || false;
+  const maxFieldsPerObject = options.maxFieldsPerObject || DEFAULT_MAX_FIELDS_PER_OBJECT;
 
   const processedObjects = new Set();
   const objectsToProcess = new Map(); // objectName -> depth
@@ -30,8 +34,8 @@ async function generateERD(salesforce, rootObjects, maxDepth = 2, options = {}) 
 
   // BFS to traverse relationships
   while (objectsToProcess.size > 0) {
-    // Check if we've hit the object limit
-    if (processedObjects.size >= maxObjects) {
+    // Check if we've hit the object limit (if set)
+    if (maxObjects && processedObjects.size >= maxObjects) {
       truncated = true;
       break;
     }
@@ -111,21 +115,21 @@ async function generateERD(salesforce, rootObjects, maxDepth = 2, options = {}) 
     }
   }
 
-  // Limit relationships if needed
-  let finalRelationships = relationships;
-  if (relationships.length > MAX_RELATIONSHIPS) {
-    finalRelationships = relationships.slice(0, MAX_RELATIONSHIPS);
-    truncated = true;
-  }
+  // No hard limit on relationships - let user decide
+  const finalRelationships = relationships;
+
+  // Check if diagram may be too large for browser rendering
+  const mayExceedBrowserLimit = processedObjects.size > WARN_OBJECTS || relationships.length > WARN_RELATIONSHIPS;
 
   // Generate Mermaid code
-  const mermaidCode = generateMermaidCode(objectDetails, finalRelationships, compact, MAX_FIELDS_PER_OBJECT);
+  const mermaidCode = generateMermaidCode(objectDetails, finalRelationships, compact, maxFieldsPerObject);
 
   return {
     mermaidCode,
     objectsIncluded: Array.from(processedObjects),
     relationshipCount: finalRelationships.length,
     truncated,
+    mayExceedBrowserLimit,
     totalObjectsFound: processedObjects.size + objectsToProcess.size
   };
 }
