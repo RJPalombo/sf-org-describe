@@ -121,9 +121,9 @@ ipcMain.handle('export:excel', async (event, objectDescriptions) => {
 });
 
 // Generate ERD
-ipcMain.handle('erd:generate', async (event, objectNames, depth) => {
+ipcMain.handle('erd:generate', async (event, objectNames, depth, options) => {
   try {
-    const erd = await erdGenerator.generateERD(salesforce, objectNames, depth);
+    const erd = await erdGenerator.generateERD(salesforce, objectNames, depth, options);
     return { success: true, data: erd };
   } catch (error) {
     return { success: false, error: error.message };

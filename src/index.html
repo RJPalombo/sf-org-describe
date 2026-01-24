@@ -841,6 +841,14 @@
                   <label>Relationship Depth:</label>
                   <input type="number" id="erdDepth" value="2" min="1" max="5">
                 </div>
+                <div class="depth-control">
+                  <label>Max Objects:</label>
+                  <input type="number" id="erdMaxObjects" value="25" min="5" max="50">
+                </div>
+                <div class="depth-control" style="gap: 4px;">
+                  <input type="checkbox" id="erdCompact" style="width: 18px; height: 18px;">
+                  <label for="erdCompact" style="cursor: pointer;">Compact (no fields)</label>
+                </div>
                 <button class="export-btn" id="generateErdBtn" disabled>Generate ERD</button>
               </div>
             </div>
@@ -1229,10 +1237,13 @@
       }
 
       const depth = parseInt(erdDepthInput.value) || 2;
+      const maxObjects = parseInt(document.getElementById('erdMaxObjects').value) || 25;
+      const compact = document.getElementById('erdCompact').checked;
+
       showLoading('Generating ERD (this may take a moment)...');
 
       try {
-        const result = await window.api.generateERD(Array.from(selectedObjects), depth);
+        const result = await window.api.generateERD(Array.from(selectedObjects), depth, { maxObjects, compact });
 
         if (result.success) {
           currentMermaidCode = result.data.mermaidCode;
@@ -1254,7 +1265,11 @@
           copyMermaidBtn.disabled = false;
           saveMermaidBtn.disabled = false;
 
-          showToast(`ERD generated with ${result.data.objectsIncluded.length} objects`, 'success');
+          let message = `ERD generated with ${result.data.objectsIncluded.length} objects`;
+          if (result.data.truncated) {
+            message += ' (truncated - try reducing depth or max objects)';
+          }
+          showToast(message, 'success');
         } else {
           throw new Error(result.error);
         }

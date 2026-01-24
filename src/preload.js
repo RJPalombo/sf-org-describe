@@ -16,7 +16,7 @@ contextBridge.exposeInMainWorld('api', {
   exportMermaid: (mermaidCode) => ipcRenderer.invoke('export:mermaid', mermaidCode),
 
   // ERD generation
-  generateERD: (objectNames, depth) => ipcRenderer.invoke('erd:generate', objectNames, depth),
+  generateERD: (objectNames, depth, options) => ipcRenderer.invoke('erd:generate', objectNames, depth, options),
 
   // Shell
   openExternal: (url) => ipcRenderer.invoke('shell:openExternal', url)

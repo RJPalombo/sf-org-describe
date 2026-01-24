@@ -2,24 +2,40 @@
  * ERD Generator - Creates Mermaid diagrams from Salesforce object relationships
  */
 
+// Limits to prevent Mermaid from exceeding max text size
+const MAX_OBJECTS = 30;
+const MAX_RELATIONSHIPS = 100;
+const MAX_FIELDS_PER_OBJECT = 8;
+
 /**
  * Generate ERD for selected objects with configurable depth
  * @param {Object} salesforce - Salesforce module instance
  * @param {string[]} rootObjects - Starting objects for the ERD
  * @param {number} maxDepth - How deep to traverse relationships (1-5)
- * @returns {Object} - { mermaidCode, objectsIncluded, relationships }
+ * @param {Object} options - { compact: boolean, maxObjects: number }
+ * @returns {Object} - { mermaidCode, objectsIncluded, relationships, truncated }
  */
-async function generateERD(salesforce, rootObjects, maxDepth = 2) {
+async function generateERD(salesforce, rootObjects, maxDepth = 2, options = {}) {
+  const maxObjects = options.maxObjects || MAX_OBJECTS;
+  const compact = options.compact || false;
+
   const processedObjects = new Set();
   const objectsToProcess = new Map(); // objectName -> depth
   const relationships = [];
   const objectDetails = new Map(); // objectName -> key fields for display
+  let truncated = false;
 
   // Initialize with root objects at depth 0
   rootObjects.forEach(obj => objectsToProcess.set(obj, 0));
 
   // BFS to traverse relationships
   while (objectsToProcess.size > 0) {
+    // Check if we've hit the object limit
+    if (processedObjects.size >= maxObjects) {
+      truncated = true;
+      break;
+    }
+
     // Get next object to process
     const [objectName, currentDepth] = objectsToProcess.entries().next().value;
     objectsToProcess.delete(objectName);
@@ -95,13 +111,22 @@ async function generateERD(salesforce, rootObjects, maxDepth = 2) {
     }
   }
 
+  // Limit relationships if needed
+  let finalRelationships = relationships;
+  if (relationships.length > MAX_RELATIONSHIPS) {
+    finalRelationships = relationships.slice(0, MAX_RELATIONSHIPS);
+    truncated = true;
+  }
+
   // Generate Mermaid code
-  const mermaidCode = generateMermaidCode(objectDetails, relationships);
+  const mermaidCode = generateMermaidCode(objectDetails, finalRelationships, compact, MAX_FIELDS_PER_OBJECT);
 
   return {
     mermaidCode,
     objectsIncluded: Array.from(processedObjects),
-    relationshipCount: relationships.length
+    relationshipCount: finalRelationships.length,
+    truncated,
+    totalObjectsFound: processedObjects.size + objectsToProcess.size
   };
 }
 
@@ -201,28 +226,37 @@ function extractKeyFields(description) {
 /**
  * Generate Mermaid ER diagram code
  */
-function generateMermaidCode(objectDetails, relationships) {
+function generateMermaidCode(objectDetails, relationships, compact = false, maxFieldsPerObject = 8) {
   let code = 'erDiagram\n';
 
   // Add entity definitions with their key fields
   for (const [objName, details] of objectDetails) {
     const safeName = sanitizeName(objName);
-    code += `    ${safeName} {\n`;
 
-    for (const field of details.fields) {
-      let fieldType = mapFieldType(field.type);
-      let fieldName = sanitizeName(field.name);
-      let attributes = [];
+    if (compact) {
+      // Compact mode: just entity names, no fields
+      code += `    ${safeName}\n`;
+    } else {
+      code += `    ${safeName} {\n`;
 
-      if (field.isPK) attributes.push('PK');
-      if (field.isFK) attributes.push('FK');
-      if (field.required) attributes.push('required');
+      // Limit fields per object
+      const fieldsToShow = details.fields.slice(0, maxFieldsPerObject);
 
-      const attrStr = attributes.length > 0 ? ` "${attributes.join(', ')}"` : '';
-      code += `        ${fieldType} ${fieldName}${attrStr}\n`;
+      for (const field of fieldsToShow) {
+        let fieldType = mapFieldType(field.type);
+        let fieldName = sanitizeName(field.name);
+        let attributes = [];
+
+        if (field.isPK) attributes.push('PK');
+        if (field.isFK) attributes.push('FK');
+        if (field.required) attributes.push('required');
+
+        const attrStr = attributes.length > 0 ? ` "${attributes.join(', ')}"` : '';
+        code += `        ${fieldType} ${fieldName}${attrStr}\n`;
+      }
+
+      code += `    }\n`;
     }
-
-    code += `    }\n`;
   }
 
   code += '\n';
