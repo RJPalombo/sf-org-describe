@@ -3,6 +3,8 @@
 # SF Org Describe - Beta Release Script
 # Creates and uploads beta releases to GitHub
 
+rm -rf dist/
+
 set -e
 
 # Colors for output
@@ -111,41 +113,41 @@ RELEASE_NOTES="## SF Org Describe v${BETA_VERSION} (Beta)
 Please report issues at: https://github.com/RJPalombo/sf-org-describe/issues
 "
 
-# Build the gh release command with available files
-RELEASE_FILES=""
+# Build array of files to upload
+RELEASE_FILES=()
 
 if [ -n "$MAC_DMG_ARM" ] && [ -f "$MAC_DMG_ARM" ]; then
-    RELEASE_FILES="$RELEASE_FILES \"$MAC_DMG_ARM\""
+    RELEASE_FILES+=("$MAC_DMG_ARM")
 fi
 if [ -n "$MAC_DMG_X64" ] && [ -f "$MAC_DMG_X64" ]; then
-    RELEASE_FILES="$RELEASE_FILES \"$MAC_DMG_X64\""
+    RELEASE_FILES+=("$MAC_DMG_X64")
 fi
 if [ -n "$MAC_ZIP_ARM" ] && [ -f "$MAC_ZIP_ARM" ]; then
-    RELEASE_FILES="$RELEASE_FILES \"$MAC_ZIP_ARM\""
+    RELEASE_FILES+=("$MAC_ZIP_ARM")
 fi
 if [ -n "$MAC_ZIP_X64" ] && [ -f "$MAC_ZIP_X64" ]; then
-    RELEASE_FILES="$RELEASE_FILES \"$MAC_ZIP_X64\""
+    RELEASE_FILES+=("$MAC_ZIP_X64")
 fi
 if [ -n "$WIN_SETUP" ] && [ -f "$WIN_SETUP" ]; then
-    RELEASE_FILES="$RELEASE_FILES \"$WIN_SETUP\""
+    RELEASE_FILES+=("$WIN_SETUP")
 fi
 if [ -n "$WIN_PORTABLE" ] && [ -f "$WIN_PORTABLE" ]; then
-    RELEASE_FILES="$RELEASE_FILES \"$WIN_PORTABLE\""
+    RELEASE_FILES+=("$WIN_PORTABLE")
 fi
 
 echo ""
 echo -e "${YELLOW}Files to upload:${NC}"
-echo "$RELEASE_FILES"
+printf '%s\n' "${RELEASE_FILES[@]}"
 
 # Create the release
 echo ""
 echo -e "${YELLOW}Creating release on GitHub...${NC}"
 
-eval gh release create "v${BETA_VERSION}" \
+gh release create "v${BETA_VERSION}" \
     --title "v${BETA_VERSION} (Beta)" \
     --notes "$RELEASE_NOTES" \
     --prerelease \
-    $RELEASE_FILES
+    "${RELEASE_FILES[@]}"
 
 echo ""
 echo -e "${GREEN}========================================${NC}"
