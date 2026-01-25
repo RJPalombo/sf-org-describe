@@ -40,6 +40,7 @@
     ],
     "mac": {
       "icon": "build/icon.png",
+      "identity": null,
       "category": "public.app-category.developer-tools",
       "target": [
         {
@@ -78,10 +79,14 @@
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true
-    }
+    },
+    "npmRebuild": false
   },
   "devDependencies": {
     "electron": "^40.0.0",
     "electron-builder": "^26.4.0"
+  },
+  "overrides": {
+    "tar": "^7.5.6"
   }
 }

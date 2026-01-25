@@ -9,12 +9,17 @@ const erdGenerator = require('./erd-generator');
 
 let mainWindow;
 
+// Set app name
+app.setName('SF Org Describe');
+
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1400,
     height: 900,
     minWidth: 1000,
     minHeight: 700,
+    title: 'SF Org Describe',
+    icon: path.join(__dirname, 'icon.png'),
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,

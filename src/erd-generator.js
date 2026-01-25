@@ -15,12 +15,13 @@ const WARN_RELATIONSHIPS = 150;
  * @param {Object} salesforce - Salesforce module instance
  * @param {string[]} rootObjects - Starting objects for the ERD
  * @param {number} maxDepth - How deep to traverse relationships (1-5)
- * @param {Object} options - { compact: boolean, maxObjects: number }
+ * @param {Object} options - { compact: boolean, maxObjects: number, selectedOnly: boolean }
  * @returns {Object} - { mermaidCode, objectsIncluded, relationships, truncated }
  */
 async function generateERD(salesforce, rootObjects, maxDepth = 2, options = {}) {
   const maxObjects = options.maxObjects || null; // null = no limit
   const compact = options.compact || false;
+  const selectedOnly = options.selectedOnly || false; // If true, only show selected objects (no traversal)
   const maxFieldsPerObject = options.maxFieldsPerObject || DEFAULT_MAX_FIELDS_PER_OBJECT;
 
   const processedObjects = new Set();
@@ -61,62 +62,72 @@ async function generateERD(salesforce, rootObjects, maxDepth = 2, options = {}) 
       // Store key fields for this object
       objectDetails.set(objectName, extractKeyFields(description));
 
-      // If we haven't reached max depth, find related objects
-      if (currentDepth < maxDepth) {
-        for (const field of description.fields) {
-          // Look for lookup and master-detail relationships
-          if (field.type === 'reference' && field.referenceTo && field.referenceTo.length > 0) {
-            for (const relatedObject of field.referenceTo) {
-              // Skip self-references and system objects
-              if (relatedObject === objectName || shouldSkipObject(relatedObject)) {
-                continue;
-              }
+      // Find related objects (respecting selectedOnly mode)
+      const shouldTraverse = selectedOnly ? false : (currentDepth < maxDepth);
 
-              // Add relationship
-              const relationshipType = field.relationshipName
-                ? (field.cascadeDelete ? 'master-detail' : 'lookup')
-                : 'lookup';
+      for (const field of description.fields) {
+        // Look for lookup and master-detail relationships
+        if (field.type === 'reference' && field.referenceTo && field.referenceTo.length > 0) {
+          for (const relatedObject of field.referenceTo) {
+            // Skip self-references and system objects
+            if (relatedObject === objectName || shouldSkipObject(relatedObject)) {
+              continue;
+            }
 
-              relationships.push({
-                from: objectName,
-                to: relatedObject,
-                field: field.name,
-                fieldLabel: field.label,
-                relationshipName: field.relationshipName,
-                type: relationshipType,
-                required: !field.nillable
-              });
+            // In selectedOnly mode, only add relationship if target is in rootObjects
+            if (selectedOnly && !rootObjects.includes(relatedObject)) {
+              continue;
+            }
 
-              // Queue related object for processing
-              if (!processedObjects.has(relatedObject) && !objectsToProcess.has(relatedObject)) {
-                objectsToProcess.set(relatedObject, currentDepth + 1);
-              }
+            // Add relationship
+            const relationshipType = field.relationshipName
+              ? (field.cascadeDelete ? 'master-detail' : 'lookup')
+              : 'lookup';
+
+            relationships.push({
+              from: objectName,
+              to: relatedObject,
+              field: field.name,
+              fieldLabel: field.label,
+              relationshipName: field.relationshipName,
+              type: relationshipType,
+              required: !field.nillable
+            });
+
+            // Queue related object for processing (only if traversal is enabled)
+            if (shouldTraverse && !processedObjects.has(relatedObject) && !objectsToProcess.has(relatedObject)) {
+              objectsToProcess.set(relatedObject, currentDepth + 1);
             }
           }
         }
+      }
 
-        // Also check child relationships and create relationship entries for them
-        if (description.childRelationships) {
-          for (const childRel of description.childRelationships) {
-            if (childRel.childSObject && !shouldSkipObject(childRel.childSObject)) {
-              // Only add if it's a meaningful relationship
-              if (childRel.relationshipName) {
-                // Create relationship from child to parent (current object)
-                // This ensures relationships are created even before child is processed
-                relationships.push({
-                  from: childRel.childSObject,
-                  to: objectName,
-                  field: childRel.field,
-                  fieldLabel: childRel.field,
-                  relationshipName: childRel.relationshipName,
-                  type: childRel.cascadeDelete ? 'master-detail' : 'lookup',
-                  required: !childRel.restrictedDelete // If not restrictable, it's required
-                });
+      // Also check child relationships and create relationship entries for them
+      if (description.childRelationships) {
+        for (const childRel of description.childRelationships) {
+          if (childRel.childSObject && !shouldSkipObject(childRel.childSObject)) {
+            // In selectedOnly mode, only add relationship if child is in rootObjects
+            if (selectedOnly && !rootObjects.includes(childRel.childSObject)) {
+              continue;
+            }
 
-                // Queue child object for processing if not already done
-                if (!processedObjects.has(childRel.childSObject) && !objectsToProcess.has(childRel.childSObject)) {
-                  objectsToProcess.set(childRel.childSObject, currentDepth + 1);
-                }
+            // Only add if it's a meaningful relationship
+            if (childRel.relationshipName) {
+              // Create relationship from child to parent (current object)
+              // This ensures relationships are created even before child is processed
+              relationships.push({
+                from: childRel.childSObject,
+                to: objectName,
+                field: childRel.field,
+                fieldLabel: childRel.field,
+                relationshipName: childRel.relationshipName,
+                type: childRel.cascadeDelete ? 'master-detail' : 'lookup',
+                required: !childRel.restrictedDelete // If not restrictable, it's required
+              });
+
+              // Queue child object for processing (only if traversal is enabled)
+              if (shouldTraverse && !processedObjects.has(childRel.childSObject) && !objectsToProcess.has(childRel.childSObject)) {
+                objectsToProcess.set(childRel.childSObject, currentDepth + 1);
               }
             }
           }

@@ -376,6 +376,118 @@
       color: white;
     }
 
+    .debug-btn {
+      padding: 8px;
+      background: transparent;
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      color: var(--text-secondary);
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .debug-btn:hover {
+      background: var(--bg-tertiary);
+      border-color: var(--accent-primary);
+      color: var(--text-primary);
+    }
+
+    .debug-btn.has-errors {
+      border-color: var(--accent-danger);
+      color: var(--accent-danger);
+    }
+
+    /* Error Log Modal */
+    .error-modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.7);
+      z-index: 2000;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .error-modal.visible {
+      display: flex;
+    }
+
+    .error-modal-content {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      width: 90%;
+      max-width: 800px;
+      max-height: 80vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .error-modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .error-modal-header h3 {
+      margin: 0;
+      font-size: 18px;
+    }
+
+    .error-modal-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    .error-modal-body {
+      flex: 1;
+      overflow: auto;
+      padding: 16px 20px;
+    }
+
+    .error-entry {
+      padding: 12px;
+      background: var(--bg-primary);
+      border-radius: 6px;
+      margin-bottom: 8px;
+      font-size: 13px;
+    }
+
+    .error-entry:last-child {
+      margin-bottom: 0;
+    }
+
+    .error-entry-time {
+      color: var(--text-muted);
+      font-size: 11px;
+      margin-bottom: 4px;
+    }
+
+    .error-entry-context {
+      color: var(--accent-warning);
+      font-weight: 500;
+      margin-bottom: 4px;
+    }
+
+    .error-entry-message {
+      color: var(--text-primary);
+      font-family: monospace;
+    }
+
+    .no-errors {
+      text-align: center;
+      color: var(--text-muted);
+      padding: 40px;
+    }
+
     /* Device flow UI */
     .device-flow-info {
       background: var(--bg-tertiary);
@@ -850,6 +962,11 @@
           <span id="statusText">Not Connected</span>
         </div>
         <button class="disconnect-btn hidden" id="disconnectBtn">Disconnect</button>
+        <button class="debug-btn" id="debugBtn" title="View Error Log">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+          </svg>
+        </button>
       </div>
     </header>
 
@@ -984,6 +1101,10 @@
                   <input type="checkbox" id="erdCompact" style="width: 18px; height: 18px;">
                   <label for="erdCompact" style="cursor: pointer;">Compact (no fields)</label>
                 </div>
+                <div class="depth-control" style="gap: 4px;">
+                  <input type="checkbox" id="erdSelectedOnly" style="width: 18px; height: 18px;">
+                  <label for="erdSelectedOnly" style="cursor: pointer;">Selected only</label>
+                </div>
                 <button class="export-btn" id="generateErdBtn" disabled>Generate ERD</button>
               </div>
             </div>
@@ -1049,6 +1170,23 @@
 
   <!-- Toast -->
   <div class="toast" id="toast"></div>
+
+  <!-- Error Log Modal -->
+  <div class="error-modal" id="errorModal">
+    <div class="error-modal-content">
+      <div class="error-modal-header">
+        <h3>Error Log</h3>
+        <div class="error-modal-actions">
+          <button class="erd-action-btn" id="exportErrorLogBtn">Export JSON</button>
+          <button class="erd-action-btn" id="clearErrorLogBtn">Clear</button>
+          <button class="erd-action-btn" id="closeErrorModalBtn">Close</button>
+        </div>
+      </div>
+      <div class="error-modal-body" id="errorLogBody">
+        <div class="no-errors">No errors logged</div>
+      </div>
+    </div>
+  </div>
 
   <!-- Mermaid library -->
   <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
@@ -1122,6 +1260,53 @@
       a.download = `sf-org-describe-errors-${new Date().toISOString().split('T')[0]}.json`;
       a.click();
       URL.revokeObjectURL(url);
+    };
+
+    // Update debug button state when errors are logged
+    function updateDebugButton() {
+      const debugBtn = document.getElementById('debugBtn');
+      if (errorLog.length > 0) {
+        debugBtn.classList.add('has-errors');
+        debugBtn.title = `View Error Log (${errorLog.length} errors)`;
+      } else {
+        debugBtn.classList.remove('has-errors');
+        debugBtn.title = 'View Error Log';
+      }
+    }
+
+    // Render error log modal content
+    function renderErrorLog() {
+      const body = document.getElementById('errorLogBody');
+      if (errorLog.length === 0) {
+        body.innerHTML = '<div class="no-errors">No errors logged</div>';
+        return;
+      }
+
+      body.innerHTML = errorLog.map((e, i) => `
+        <div class="error-entry">
+          <div class="error-entry-time">${e.timestamp}</div>
+          <div class="error-entry-context">${e.context}</div>
+          <div class="error-entry-message">${e.message}</div>
+        </div>
+      `).reverse().join('');
+    }
+
+    // Show error modal
+    function showErrorModal() {
+      renderErrorLog();
+      document.getElementById('errorModal').classList.add('visible');
+    }
+
+    // Hide error modal
+    function hideErrorModal() {
+      document.getElementById('errorModal').classList.remove('visible');
+    }
+
+    // Wrap logError to update button
+    const originalLogError = logError;
+    logError = function(context, error) {
+      originalLogError(context, error);
+      updateDebugButton();
     };
 
     // DOM Elements
@@ -1477,11 +1662,12 @@
       const maxObjectsInput = parseInt(document.getElementById('erdMaxObjects').value);
       const maxObjects = maxObjectsInput > 0 ? maxObjectsInput : null; // 0 or empty = unlimited
       const compact = document.getElementById('erdCompact').checked;
+      const selectedOnly = document.getElementById('erdSelectedOnly').checked;
 
       showLoading('Generating ERD (this may take a moment)...');
 
       try {
-        const result = await window.api.generateERD(Array.from(selectedObjects), depth, { maxObjects, compact });
+        const result = await window.api.generateERD(Array.from(selectedObjects), depth, { maxObjects, compact, selectedOnly });
 
         if (result.success) {
           currentMermaidCode = result.data.mermaidCode;
@@ -1777,6 +1963,23 @@
         loadObjects();
       }
     }
+
+    // Debug/Error log button handlers
+    document.getElementById('debugBtn').addEventListener('click', showErrorModal);
+    document.getElementById('closeErrorModalBtn').addEventListener('click', hideErrorModal);
+    document.getElementById('exportErrorLogBtn').addEventListener('click', () => {
+      window.exportErrorLog();
+      showToast('Error log exported', 'success');
+    });
+    document.getElementById('clearErrorLogBtn').addEventListener('click', () => {
+      errorLog = [];
+      updateDebugButton();
+      renderErrorLog();
+      showToast('Error log cleared', 'success');
+    });
+    document.getElementById('errorModal').addEventListener('click', (e) => {
+      if (e.target.id === 'errorModal') hideErrorModal();
+    });
 
     init();
   </script>
