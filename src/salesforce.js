@@ -6,8 +6,19 @@ const https = require('https');
 // It works across all Salesforce orgs without requiring users to create their own Connected App
 const SFDX_CLIENT_ID = 'PlatformCLI';
 
-// Allow override via environment variable for users who want their own Connected App
-const CLIENT_ID = process.env.SF_CLIENT_ID || SFDX_CLIENT_ID;
+// Default from environment, can be overridden at runtime
+let customClientId = null;
+
+function getClientId() {
+  return customClientId || process.env.SF_CLIENT_ID || SFDX_CLIENT_ID;
+}
+
+/**
+ * Set a custom client ID (from UI settings)
+ */
+function setClientId(clientId) {
+  customClientId = clientId || null;
+}
 
 let connection = null;
 let orgInfo = null;
@@ -18,7 +29,7 @@ let orgInfo = null;
  */
 async function startDeviceFlow(loginUrl = 'https://login.salesforce.com') {
   return new Promise((resolve, reject) => {
-    const postData = `response_type=device_code&client_id=${CLIENT_ID}&scope=api refresh_token`;
+    const postData = `response_type=device_code&client_id=${getClientId()}&scope=api refresh_token`;
 
     const url = new URL(loginUrl);
     const options = {
@@ -66,7 +77,7 @@ async function startDeviceFlow(loginUrl = 'https://login.salesforce.com') {
  */
 async function pollDeviceFlow(deviceCode, loginUrl = 'https://login.salesforce.com') {
   return new Promise((resolve, reject) => {
-    const postData = `grant_type=device&client_id=${CLIENT_ID}&code=${deviceCode}`;
+    const postData = `grant_type=device&client_id=${getClientId()}&code=${deviceCode}`;
 
     const url = new URL(loginUrl);
     const options = {
@@ -97,7 +108,7 @@ async function pollDeviceFlow(deviceCode, loginUrl = 'https://login.salesforce.c
               accessToken: result.access_token,
               refreshToken: result.refresh_token,
               oauth2: {
-                clientId: CLIENT_ID,
+                clientId: getClientId(),
                 loginUrl: loginUrl
               }
             });
@@ -219,5 +230,6 @@ module.exports = {
   getAllObjects,
   describeObjects,
   describeObject,
-  getConnection
+  getConnection,
+  setClientId
 };

@@ -360,6 +360,139 @@
       cursor: not-allowed;
     }
 
+    /* Settings Section */
+    .settings-section {
+      margin-top: 32px;
+      border-top: 1px solid var(--border-color);
+      padding-top: 20px;
+    }
+
+    .settings-toggle {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: transparent;
+      border: none;
+      color: var(--text-secondary);
+      font-size: 14px;
+      cursor: pointer;
+      padding: 8px 0;
+      transition: color 0.2s;
+    }
+
+    .settings-toggle:hover {
+      color: var(--text-primary);
+    }
+
+    .settings-toggle svg {
+      opacity: 0.7;
+    }
+
+    .settings-arrow {
+      font-size: 10px;
+      transition: transform 0.2s;
+      margin-left: auto;
+    }
+
+    .settings-toggle.expanded .settings-arrow {
+      transform: rotate(90deg);
+    }
+
+    .settings-content {
+      margin-top: 16px;
+      padding: 20px;
+      background: var(--bg-primary);
+      border-radius: 8px;
+      border: 1px solid var(--border-color);
+    }
+
+    .settings-content.hidden {
+      display: none;
+    }
+
+    .settings-info {
+      margin-bottom: 16px;
+      font-size: 13px;
+      color: var(--text-secondary);
+    }
+
+    .settings-info p {
+      margin: 4px 0;
+    }
+
+    .settings-field {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-bottom: 20px;
+    }
+
+    .settings-field label {
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-primary);
+    }
+
+    .settings-field input {
+      padding: 10px 12px;
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      color: var(--text-primary);
+      font-size: 14px;
+      font-family: monospace;
+    }
+
+    .settings-field input:focus {
+      outline: none;
+      border-color: var(--accent-primary);
+    }
+
+    .settings-save-btn {
+      align-self: flex-start;
+      padding: 8px 16px;
+      background: var(--accent-primary);
+      border: none;
+      border-radius: 6px;
+      color: white;
+      font-size: 13px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .settings-save-btn:hover {
+      background: var(--accent-hover);
+    }
+
+    .settings-help {
+      font-size: 12px;
+      color: var(--text-muted);
+      background: var(--bg-tertiary);
+      padding: 16px;
+      border-radius: 6px;
+    }
+
+    .settings-help p {
+      margin: 0 0 8px 0;
+    }
+
+    .settings-help ol {
+      margin: 0;
+      padding-left: 20px;
+    }
+
+    .settings-help li {
+      margin: 6px 0;
+      line-height: 1.5;
+    }
+
+    .settings-help code {
+      background: var(--bg-primary);
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 11px;
+    }
+
     .disconnect-btn {
       padding: 10px 20px;
       background: transparent;
@@ -1050,6 +1183,42 @@
               <p>Click the button below to open the login page in your browser.</p>
               <button class="open-browser-btn" id="openBrowserBtn">Open Salesforce Login</button>
             </div>
+
+            <!-- Custom Connected App Settings -->
+            <div class="settings-section">
+              <button class="settings-toggle" id="settingsToggle">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="12" cy="12" r="3"/>
+                  <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"/>
+                </svg>
+                Advanced Settings
+                <span class="settings-arrow">▶</span>
+              </button>
+              <div class="settings-content hidden" id="settingsContent">
+                <div class="settings-info">
+                  <p><strong>Custom Connected App</strong></p>
+                  <p>By default, this app uses Salesforce CLI's public Connected App. If your org blocks this or you need a custom app, enter your own Client ID below.</p>
+                </div>
+                <div class="settings-field">
+                  <label for="customClientId">Connected App Client ID (Consumer Key)</label>
+                  <input type="text" id="customClientId" placeholder="Enter your Client ID (leave empty for default)">
+                  <button class="settings-save-btn" id="saveClientIdBtn">Save</button>
+                </div>
+                <div class="settings-help">
+                  <p><strong>How to create a Connected App:</strong></p>
+                  <ol>
+                    <li>Go to Setup → App Manager → New Connected App</li>
+                    <li>Enter a name and your email</li>
+                    <li>Enable OAuth Settings</li>
+                    <li>Add Callback URL: <code>https://login.salesforce.com/services/oauth2/callback</code></li>
+                    <li>Select scopes: <code>api</code>, <code>refresh_token</code></li>
+                    <li><strong>Check "Enable for Device Flow"</strong></li>
+                    <li>Save and wait 10 minutes for propagation</li>
+                    <li>Copy the Consumer Key and paste above</li>
+                  </ol>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -1382,6 +1551,41 @@
         renderObjectList();
       });
     });
+
+    // Settings toggle
+    const settingsToggle = document.getElementById('settingsToggle');
+    const settingsContent = document.getElementById('settingsContent');
+    const customClientIdInput = document.getElementById('customClientId');
+    const saveClientIdBtn = document.getElementById('saveClientIdBtn');
+
+    // Load saved client ID
+    const savedClientId = localStorage.getItem('sf_custom_client_id');
+    if (savedClientId) {
+      customClientIdInput.value = savedClientId;
+    }
+
+    settingsToggle.addEventListener('click', () => {
+      settingsToggle.classList.toggle('expanded');
+      settingsContent.classList.toggle('hidden');
+    });
+
+    saveClientIdBtn.addEventListener('click', async () => {
+      const clientId = customClientIdInput.value.trim();
+      if (clientId) {
+        localStorage.setItem('sf_custom_client_id', clientId);
+        await window.api.setClientId(clientId);
+        showToast('Client ID saved. It will be used for future connections.', 'success');
+      } else {
+        localStorage.removeItem('sf_custom_client_id');
+        await window.api.setClientId(null);
+        showToast('Custom Client ID cleared. Using default.', 'success');
+      }
+    });
+
+    // Apply saved client ID on startup
+    if (savedClientId) {
+      window.api.setClientId(savedClientId);
+    }
 
     // Connect button
     connectBtn.addEventListener('click', startAuth);

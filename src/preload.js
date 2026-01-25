@@ -6,6 +6,7 @@ contextBridge.exposeInMainWorld('api', {
   pollDeviceFlow: (deviceCode, loginUrl) => ipcRenderer.invoke('auth:pollDeviceFlow', deviceCode, loginUrl),
   disconnect: () => ipcRenderer.invoke('auth:disconnect'),
   getAuthStatus: () => ipcRenderer.invoke('auth:getStatus'),
+  setClientId: (clientId) => ipcRenderer.invoke('auth:setClientId', clientId),
 
   // Salesforce operations
   getObjects: () => ipcRenderer.invoke('sf:getObjects'),

@@ -80,6 +80,12 @@ ipcMain.handle('auth:disconnect', async () => {
   return { success: true };
 });
 
+// Set custom Client ID
+ipcMain.handle('auth:setClientId', async (event, clientId) => {
+  salesforce.setClientId(clientId);
+  return { success: true };
+});
+
 // Get connection status
 ipcMain.handle('auth:getStatus', async () => {
   return salesforce.getConnectionStatus();
