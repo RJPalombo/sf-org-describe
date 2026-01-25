@@ -22,7 +22,6 @@
   "type": "commonjs",
   "dependencies": {
     "dotenv": "^17.2.3",
-    "electron-builder": "^26.4.0",
     "exceljs": "^4.4.0",
     "jsforce": "^3.10.13",
     "open": "^11.0.0",
@@ -32,13 +31,15 @@
     "appId": "com.sforgdescribe.app",
     "productName": "SF Org Describe",
     "directories": {
-      "output": "dist"
+      "output": "dist",
+      "buildResources": "build"
     },
     "files": [
       "src/**/*",
       "package.json"
     ],
     "mac": {
+      "icon": "build/icon.png",
       "category": "public.app-category.developer-tools",
       "target": [
         {
@@ -58,6 +59,7 @@
       ]
     },
     "win": {
+      "icon": "build/icon.png",
       "target": [
         {
           "target": "nsis",
@@ -79,6 +81,7 @@
     }
   },
   "devDependencies": {
-    "electron": "^40.0.0"
+    "electron": "^40.0.0",
+    "electron-builder": "^26.4.0"
   }
 }
