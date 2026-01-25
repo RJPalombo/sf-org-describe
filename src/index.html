@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:;">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:;">
   <title>SF Org Describe</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
@@ -142,10 +142,12 @@
       display: flex;
       gap: 8px;
       margin-top: 12px;
+      flex-wrap: wrap;
     }
 
     .filter-btn {
       flex: 1;
+      min-width: 60px;
       padding: 8px;
       background: var(--bg-tertiary);
       border: 1px solid var(--border-color);
@@ -556,13 +558,141 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      overflow: auto;
-      padding: 20px;
+      overflow: hidden;
+      padding: 0;
+      position: relative;
     }
 
     .mermaid-preview svg {
-      max-width: 100%;
-      height: auto;
+      cursor: grab;
+    }
+
+    .mermaid-preview svg:active {
+      cursor: grabbing;
+    }
+
+    .mermaid-preview.fullscreen {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      z-index: 999;
+      padding: 20px;
+    }
+
+    /* Fullscreen close button */
+    .fullscreen-close-btn {
+      display: none;
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      z-index: 1001;
+      width: 44px;
+      height: 44px;
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      color: var(--text-primary);
+      font-size: 24px;
+      cursor: pointer;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s;
+    }
+
+    .fullscreen-close-btn:hover {
+      background: var(--accent-danger);
+      border-color: var(--accent-danger);
+    }
+
+    .mermaid-preview.fullscreen ~ .fullscreen-close-btn,
+    .mermaid-preview.fullscreen + .fullscreen-close-btn {
+      display: flex;
+    }
+
+    /* Zoom controls */
+    .zoom-controls {
+      position: absolute;
+      bottom: 16px;
+      right: 16px;
+      display: flex;
+      gap: 8px;
+      z-index: 10;
+    }
+
+    .zoom-btn {
+      width: 36px;
+      height: 36px;
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      color: var(--text-primary);
+      font-size: 18px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s;
+    }
+
+    .zoom-btn:hover {
+      background: var(--bg-tertiary);
+      border-color: var(--accent-primary);
+    }
+
+    .zoom-level {
+      padding: 8px 12px;
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      color: var(--text-primary);
+      font-size: 13px;
+      min-width: 60px;
+      text-align: center;
+    }
+
+    /* Export dropdown */
+    .export-dropdown {
+      position: relative;
+      display: inline-block;
+    }
+
+    .export-dropdown-content {
+      display: none;
+      position: absolute;
+      bottom: calc(100% + 4px);
+      right: 0;
+      background: var(--bg-tertiary);
+      border: 1px solid var(--accent-primary);
+      border-radius: 6px;
+      min-width: 160px;
+      z-index: 1000;
+      box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.4);
+    }
+
+    .export-dropdown-content.show {
+      display: block;
+    }
+
+    .export-dropdown-item {
+      padding: 10px 16px;
+      cursor: pointer;
+      font-size: 13px;
+      color: var(--text-primary);
+      transition: background 0.2s;
+    }
+
+    .export-dropdown-item:hover {
+      background: var(--bg-tertiary);
+    }
+
+    .export-dropdown-item:first-child {
+      border-radius: 6px 6px 0 0;
+    }
+
+    .export-dropdown-item:last-child {
+      border-radius: 0 0 6px 6px;
     }
 
     .mermaid-code {
@@ -733,6 +863,7 @@
             <button class="filter-btn active" data-filter="all">All</button>
             <button class="filter-btn" data-filter="standard">Standard</button>
             <button class="filter-btn" data-filter="custom">Custom</button>
+            <button class="filter-btn" data-filter="selected">Selected</button>
           </div>
         </div>
         <div class="object-list" id="objectList">
@@ -843,7 +974,7 @@
               <div class="erd-controls">
                 <div class="depth-control">
                   <label>Relationship Depth:</label>
-                  <input type="number" id="erdDepth" value="2" min="1" max="5">
+                  <input type="number" id="erdDepth" value="1" min="1" max="5">
                 </div>
                 <div class="depth-control">
                   <label>Max Objects (0=unlimited):</label>
@@ -861,6 +992,19 @@
               <div class="erd-preview-header">
                 <h4>ERD Preview</h4>
                 <div class="erd-actions">
+                  <button class="erd-action-btn" id="fullscreenBtn" disabled title="Fullscreen">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>
+                    </svg>
+                  </button>
+                  <div class="export-dropdown">
+                    <button class="erd-action-btn" id="exportImageBtn" disabled>Export As...</button>
+                    <div class="export-dropdown-content" id="exportDropdown">
+                      <div class="export-dropdown-item" data-format="png">PNG Image</div>
+                      <div class="export-dropdown-item" data-format="svg">SVG Vector</div>
+                      <div class="export-dropdown-item" data-format="pdf">PDF Document</div>
+                    </div>
+                  </div>
                   <button class="erd-action-btn" id="openMermaidLiveBtn" disabled>Open in Mermaid Live</button>
                   <button class="erd-action-btn" id="copyMermaidBtn" disabled>Copy Code</button>
                   <button class="erd-action-btn" id="saveMermaidBtn" disabled>Save as Markdown</button>
@@ -868,6 +1012,12 @@
               </div>
               <div class="erd-preview">
                 <div class="mermaid-preview" id="mermaidPreview">
+                  <div class="zoom-controls" id="zoomControls" style="display: none;">
+                    <button class="zoom-btn" id="zoomOutBtn" title="Zoom Out">−</button>
+                    <span class="zoom-level" id="zoomLevel">100%</span>
+                    <button class="zoom-btn" id="zoomInBtn" title="Zoom In">+</button>
+                    <button class="zoom-btn" id="zoomResetBtn" title="Reset Zoom">↺</button>
+                  </div>
                   <div class="empty-state">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                       <rect x="3" y="3" width="7" height="7"/>
@@ -879,6 +1029,7 @@
                     <p>Select objects and click "Generate ERD" to create a diagram</p>
                   </div>
                 </div>
+                <button class="fullscreen-close-btn" id="fullscreenCloseBtn" title="Exit Fullscreen (Esc)">×</button>
                 <div class="mermaid-code" id="mermaidCode">
                   <pre id="mermaidCodePre">// Mermaid code will appear here</pre>
                 </div>
@@ -901,6 +1052,8 @@
 
   <!-- Mermaid library -->
   <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <!-- Panzoom library for zoom/pan -->
+  <script src="https://cdn.jsdelivr.net/npm/panzoom@9.4.3/dist/panzoom.min.js"></script>
 
   <script>
     // Initialize Mermaid
@@ -925,6 +1078,51 @@
     let selectedObjects = new Set();
     let currentFilter = 'all';
     let currentMermaidCode = '';
+    let panzoomInstance = null;
+    let currentZoom = 1;
+    let errorLog = [];
+
+    // Error logging function
+    function logError(context, error) {
+      const entry = {
+        timestamp: new Date().toISOString(),
+        context: context,
+        message: error.message || String(error),
+        stack: error.stack || null
+      };
+      errorLog.push(entry);
+      console.error(`[${entry.timestamp}] ${context}:`, error);
+
+      // Keep only last 50 errors
+      if (errorLog.length > 50) {
+        errorLog.shift();
+      }
+    }
+
+    // View error log (accessible via console: viewErrorLog())
+    window.viewErrorLog = function() {
+      if (errorLog.length === 0) {
+        console.log('No errors logged.');
+        return;
+      }
+      console.table(errorLog.map(e => ({
+        time: e.timestamp,
+        context: e.context,
+        message: e.message
+      })));
+      return errorLog;
+    };
+
+    // Export error log
+    window.exportErrorLog = function() {
+      const blob = new Blob([JSON.stringify(errorLog, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `sf-org-describe-errors-${new Date().toISOString().split('T')[0]}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    };
 
     // DOM Elements
     const statusDot = document.getElementById('statusDot');
@@ -1016,15 +1214,28 @@
       showToast('Mermaid code copied to clipboard', 'success');
     });
 
-    // Open in Mermaid Live
-    document.getElementById('openMermaidLiveBtn').addEventListener('click', () => {
-      // Encode the mermaid code for URL
-      const encoded = btoa(encodeURIComponent(currentMermaidCode));
-      const url = `https://mermaid.live/edit#pako:${encoded}`;
-      // For large diagrams, just copy to clipboard and open the site
-      navigator.clipboard.writeText(currentMermaidCode);
-      window.api.openExternal('https://mermaid.live/edit');
-      showToast('Code copied! Paste it in Mermaid Live editor', 'success');
+    // Open in Mermaid Live with proper encoding
+    document.getElementById('openMermaidLiveBtn').addEventListener('click', async () => {
+      try {
+        // Mermaid Live uses pako compression then base64
+        // We'll use a simpler approach: base64 encode the JSON state
+        const state = {
+          code: currentMermaidCode,
+          mermaid: { theme: 'default' },
+          autoSync: true,
+          updateDiagram: true
+        };
+        const jsonString = JSON.stringify(state);
+        const base64 = btoa(unescape(encodeURIComponent(jsonString)));
+        const url = `https://mermaid.live/edit#base64:${base64}`;
+        window.api.openExternal(url);
+        showToast('Opening Mermaid Live with your diagram', 'success');
+      } catch (e) {
+        // Fallback: copy to clipboard
+        navigator.clipboard.writeText(currentMermaidCode);
+        window.api.openExternal('https://mermaid.live/edit');
+        showToast('Code copied! Paste it in Mermaid Live editor', 'success');
+      }
     });
 
     // Save Mermaid file
@@ -1055,10 +1266,12 @@
           // Start polling
           startPolling(result.data.interval);
         } else {
+          logError('Auth start', { message: result.error });
           showToast('Failed to start auth: ' + result.error, 'error');
           connectBtn.disabled = false;
         }
       } catch (error) {
+        logError('Auth start exception', error);
         showToast('Error: ' + error.message, 'error');
         connectBtn.disabled = false;
       }
@@ -1068,6 +1281,9 @@
 
     // Poll for auth completion
     function startPolling(interval) {
+      // Use at least 8 seconds to avoid "polling too quickly" error from Salesforce
+      const pollIntervalMs = Math.max((interval || 5), 8) * 1000;
+
       pollInterval = setInterval(async () => {
         try {
           const result = await window.api.pollDeviceFlow(deviceCode, selectedLoginUrl);
@@ -1084,6 +1300,7 @@
           } else if (!result.pending) {
             // Error (not just pending)
             clearInterval(pollInterval);
+            logError('Auth polling', { message: result.error });
             showToast('Auth failed: ' + result.error, 'error');
             deviceFlowInfo.classList.add('hidden');
             connectBtn.classList.remove('hidden');
@@ -1092,9 +1309,10 @@
           // If pending, just continue polling
         } catch (error) {
           clearInterval(pollInterval);
+          logError('Auth polling exception', error);
           showToast('Error: ' + error.message, 'error');
         }
-      }, (interval || 5) * 1000);
+      }, pollIntervalMs);
     }
 
     // Update connection status UI
@@ -1125,9 +1343,11 @@
           renderObjectList();
           sidebarFooter.classList.remove('hidden');
         } else {
+          logError('Load objects', { message: result.error });
           showToast('Failed to load objects: ' + result.error, 'error');
         }
       } catch (error) {
+        logError('Load objects exception', error);
         showToast('Error: ' + error.message, 'error');
       }
 
@@ -1142,6 +1362,7 @@
         // Filter by type
         if (currentFilter === 'standard' && obj.custom) return false;
         if (currentFilter === 'custom' && !obj.custom) return false;
+        if (currentFilter === 'selected' && !selectedObjects.has(obj.name)) return false;
 
         // Filter by search
         if (searchTerm) {
@@ -1267,21 +1488,44 @@
           mermaidCodePre.textContent = currentMermaidCode;
 
           // Render Mermaid diagram
+          let renderSuccess = false;
           try {
-            const { svg } = await mermaid.render('erd-diagram', currentMermaidCode);
+            // Generate unique ID to avoid conflicts
+            const diagramId = 'erd-diagram-' + Date.now();
+            const { svg } = await mermaid.render(diagramId, currentMermaidCode);
+
+            // Preserve zoom controls by inserting SVG before them
+            const zoomControls = document.getElementById('zoomControls');
+            mermaidPreview.innerHTML = '';
             mermaidPreview.innerHTML = svg;
+            mermaidPreview.appendChild(zoomControls);
+            renderSuccess = true;
           } catch (renderError) {
+            console.error('Mermaid render error:', renderError);
+            logError('Mermaid render error', renderError);
+            const zoomControls = document.getElementById('zoomControls');
             mermaidPreview.innerHTML = `
               <div class="empty-state">
                 <h3>Render Error</h3>
                 <p>Could not render diagram. The Mermaid code is available on the right.</p>
+                <p style="font-size: 12px; color: var(--text-muted);">${renderError.message || 'Unknown error'}</p>
               </div>
             `;
+            mermaidPreview.appendChild(zoomControls);
           }
 
           document.getElementById('openMermaidLiveBtn').disabled = false;
           copyMermaidBtn.disabled = false;
           saveMermaidBtn.disabled = false;
+          document.getElementById('fullscreenBtn').disabled = !renderSuccess;
+          document.getElementById('exportImageBtn').disabled = !renderSuccess;
+
+          // Initialize panzoom on the SVG (only if render succeeded)
+          if (renderSuccess) {
+            initPanzoom();
+          } else {
+            document.getElementById('zoomControls').style.display = 'none';
+          }
 
           let message = `ERD generated with ${result.data.objectsIncluded.length} objects, ${result.data.relationshipCount} relationships`;
           if (result.data.truncated) {
@@ -1296,7 +1540,209 @@
           throw new Error(result.error);
         }
       } catch (error) {
+        logError('ERD generation', error);
         showToast('ERD generation failed: ' + error.message, 'error');
+      }
+
+      hideLoading();
+    }
+
+    // Initialize panzoom for the ERD
+    function initPanzoom() {
+      const svg = mermaidPreview.querySelector('svg');
+      if (!svg) return;
+
+      // Destroy existing instance
+      if (panzoomInstance) {
+        panzoomInstance.dispose();
+      }
+
+      // Show zoom controls
+      document.getElementById('zoomControls').style.display = 'flex';
+
+      // Initialize panzoom
+      panzoomInstance = panzoom(svg, {
+        maxZoom: 5,
+        minZoom: 0.1,
+        initialZoom: 1,
+        bounds: true,
+        boundsPadding: 0.1
+      });
+
+      // Update zoom level display
+      panzoomInstance.on('zoom', (e) => {
+        currentZoom = e.getTransform().scale;
+        document.getElementById('zoomLevel').textContent = Math.round(currentZoom * 100) + '%';
+      });
+
+      currentZoom = 1;
+      document.getElementById('zoomLevel').textContent = '100%';
+    }
+
+    // Zoom controls
+    document.getElementById('zoomInBtn').addEventListener('click', () => {
+      if (panzoomInstance) {
+        const svg = mermaidPreview.querySelector('svg');
+        if (svg) {
+          const rect = svg.getBoundingClientRect();
+          panzoomInstance.smoothZoom(rect.width / 2, rect.height / 2, 1.25);
+        }
+      }
+    });
+
+    document.getElementById('zoomOutBtn').addEventListener('click', () => {
+      if (panzoomInstance) {
+        const svg = mermaidPreview.querySelector('svg');
+        if (svg) {
+          const rect = svg.getBoundingClientRect();
+          panzoomInstance.smoothZoom(rect.width / 2, rect.height / 2, 0.8);
+        }
+      }
+    });
+
+    document.getElementById('zoomResetBtn').addEventListener('click', () => {
+      if (panzoomInstance) {
+        panzoomInstance.moveTo(0, 0);
+        panzoomInstance.zoomAbs(0, 0, 1);
+        currentZoom = 1;
+        document.getElementById('zoomLevel').textContent = '100%';
+      }
+    });
+
+    // Fullscreen toggle
+    document.getElementById('fullscreenBtn').addEventListener('click', () => {
+      mermaidPreview.classList.toggle('fullscreen');
+      const isFullscreen = mermaidPreview.classList.contains('fullscreen');
+
+      // Update button icon
+      const btn = document.getElementById('fullscreenBtn');
+      btn.innerHTML = isFullscreen
+        ? '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 14h6m-6 0v6m16-6h-6m6 0v6M4 10h6m-6 0V4m16 6h-6m6 0V4"/></svg>'
+        : '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>';
+    });
+
+    // Exit fullscreen function
+    function exitFullscreen() {
+      mermaidPreview.classList.remove('fullscreen');
+      document.getElementById('fullscreenBtn').innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>';
+    }
+
+    // Close fullscreen on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && mermaidPreview.classList.contains('fullscreen')) {
+        exitFullscreen();
+      }
+    });
+
+    // Fullscreen close button
+    document.getElementById('fullscreenCloseBtn').addEventListener('click', exitFullscreen);
+
+    // Export dropdown toggle
+    document.getElementById('exportImageBtn').addEventListener('click', (e) => {
+      e.stopPropagation();
+      document.getElementById('exportDropdown').classList.toggle('show');
+    });
+
+    // Close dropdown when clicking outside
+    document.addEventListener('click', () => {
+      document.getElementById('exportDropdown').classList.remove('show');
+    });
+
+    // Export handlers
+    document.querySelectorAll('.export-dropdown-item').forEach(item => {
+      item.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const format = item.dataset.format;
+        document.getElementById('exportDropdown').classList.remove('show');
+        await exportDiagram(format);
+      });
+    });
+
+    // Export diagram to various formats
+    async function exportDiagram(format) {
+      const svg = mermaidPreview.querySelector('svg');
+      if (!svg) {
+        showToast('No diagram to export', 'error');
+        return;
+      }
+
+      showLoading(`Exporting as ${format.toUpperCase()}...`);
+
+      try {
+        // Clone SVG and prepare it
+        const svgClone = svg.cloneNode(true);
+        svgClone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+
+        // Remove any transforms from panzoom
+        svgClone.style.transform = '';
+
+        const svgData = new XMLSerializer().serializeToString(svgClone);
+        const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
+
+        if (format === 'svg') {
+          // Direct SVG download
+          const result = await window.api.exportDiagram(svgData, 'svg');
+          if (result.success) {
+            showToast(`Saved to ${result.filePath}`, 'success');
+          } else if (!result.cancelled) {
+            throw new Error(result.error);
+          }
+        } else if (format === 'png' || format === 'pdf') {
+          // Convert to canvas first
+          const img = new Image();
+          const url = URL.createObjectURL(svgBlob);
+
+          img.onload = async () => {
+            // Create canvas with higher resolution for quality
+            const scale = 2;
+            const canvas = document.createElement('canvas');
+            canvas.width = img.width * scale;
+            canvas.height = img.height * scale;
+
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = 'white';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.scale(scale, scale);
+            ctx.drawImage(img, 0, 0);
+
+            URL.revokeObjectURL(url);
+
+            if (format === 'png') {
+              const pngData = canvas.toDataURL('image/png');
+              const result = await window.api.exportDiagram(pngData, 'png');
+              if (result.success) {
+                showToast(`Saved to ${result.filePath}`, 'success');
+              } else if (!result.cancelled) {
+                throw new Error(result.error);
+              }
+            } else if (format === 'pdf') {
+              // For PDF, we pass the PNG data and dimensions
+              const pngData = canvas.toDataURL('image/png');
+              const result = await window.api.exportDiagram(pngData, 'pdf', {
+                width: img.width,
+                height: img.height
+              });
+              if (result.success) {
+                showToast(`Saved to ${result.filePath}`, 'success');
+              } else if (!result.cancelled) {
+                throw new Error(result.error);
+              }
+            }
+
+            hideLoading();
+          };
+
+          img.onerror = () => {
+            URL.revokeObjectURL(url);
+            hideLoading();
+            showToast('Failed to render diagram', 'error');
+          };
+
+          img.src = url;
+          return; // Don't hide loading yet, wait for img.onload
+        }
+      } catch (error) {
+        showToast(`Export failed: ${error.message}`, 'error');
       }
 
       hideLoading();

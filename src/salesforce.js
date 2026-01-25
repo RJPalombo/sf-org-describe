@@ -46,7 +46,7 @@ async function startDeviceFlow(loginUrl = 'https://login.salesforce.com') {
               userCode: result.user_code,
               verificationUri: result.verification_uri,
               expiresIn: result.expires_in,
-              interval: result.interval || 5
+              interval: Math.max(result.interval || 5, 8) // Minimum 8 seconds to avoid "polling too quickly"
             });
           }
         } catch (e) {

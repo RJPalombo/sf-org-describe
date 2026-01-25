@@ -156,3 +156,73 @@ ipcMain.handle('export:mermaid', async (event, mermaidCode) => {
     return { success: false, error: error.message };
   }
 });
+
+// Export diagram to PNG, SVG, or PDF
+ipcMain.handle('export:diagram', async (event, data, format, options = {}) => {
+  try {
+    const fs = require('fs');
+
+    const filters = {
+      png: [{ name: 'PNG Images', extensions: ['png'] }],
+      svg: [{ name: 'SVG Files', extensions: ['svg'] }],
+      pdf: [{ name: 'PDF Documents', extensions: ['pdf'] }]
+    };
+
+    const { filePath } = await dialog.showSaveDialog(mainWindow, {
+      title: `Save ERD as ${format.toUpperCase()}`,
+      defaultPath: `ERD_${new Date().toISOString().split('T')[0]}.${format}`,
+      filters: filters[format] || filters.png
+    });
+
+    if (!filePath) {
+      return { success: false, cancelled: true };
+    }
+
+    if (format === 'svg') {
+      // SVG is just text
+      fs.writeFileSync(filePath, data);
+    } else if (format === 'png') {
+      // PNG comes as base64 data URL
+      const base64Data = data.replace(/^data:image\/png;base64,/, '');
+      fs.writeFileSync(filePath, Buffer.from(base64Data, 'base64'));
+    } else if (format === 'pdf') {
+      // PDF - use PDFKit to create a PDF with the image
+      const PDFDocument = require('pdfkit');
+      const doc = new PDFDocument({
+        autoFirstPage: false
+      });
+
+      // Create page sized to fit the image (with some margin)
+      const imgWidth = options.width || 800;
+      const imgHeight = options.height || 600;
+      const margin = 40;
+
+      doc.addPage({
+        size: [imgWidth + margin * 2, imgHeight + margin * 2]
+      });
+
+      // Add the PNG image
+      const base64Data = data.replace(/^data:image\/png;base64,/, '');
+      const imgBuffer = Buffer.from(base64Data, 'base64');
+      doc.image(imgBuffer, margin, margin, {
+        width: imgWidth,
+        height: imgHeight
+      });
+
+      // Write to file
+      const stream = fs.createWriteStream(filePath);
+      doc.pipe(stream);
+      doc.end();
+
+      // Wait for stream to finish
+      await new Promise((resolve, reject) => {
+        stream.on('finish', resolve);
+        stream.on('error', reject);
+      });
+    }
+
+    return { success: true, filePath };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});

@@ -25,7 +25,8 @@
     "electron-builder": "^26.4.0",
     "exceljs": "^4.4.0",
     "jsforce": "^3.10.13",
-    "open": "^11.0.0"
+    "open": "^11.0.0",
+    "pdfkit": "^0.15.2"
   },
   "build": {
     "appId": "com.sforgdescribe.app",

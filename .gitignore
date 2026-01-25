@@ -28,3 +28,6 @@ npm-debug.log*
 *.exe
 *.zip
 *.AppImage
+
+# Claude Code context (local notes)
+.claude/

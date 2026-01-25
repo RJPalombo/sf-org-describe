@@ -95,13 +95,26 @@ async function generateERD(salesforce, rootObjects, maxDepth = 2, options = {}) 
           }
         }
 
-        // Also check child relationships
+        // Also check child relationships and create relationship entries for them
         if (description.childRelationships) {
           for (const childRel of description.childRelationships) {
             if (childRel.childSObject && !shouldSkipObject(childRel.childSObject)) {
               // Only add if it's a meaningful relationship
-              if (childRel.relationshipName && !processedObjects.has(childRel.childSObject)) {
-                if (!objectsToProcess.has(childRel.childSObject)) {
+              if (childRel.relationshipName) {
+                // Create relationship from child to parent (current object)
+                // This ensures relationships are created even before child is processed
+                relationships.push({
+                  from: childRel.childSObject,
+                  to: objectName,
+                  field: childRel.field,
+                  fieldLabel: childRel.field,
+                  relationshipName: childRel.relationshipName,
+                  type: childRel.cascadeDelete ? 'master-detail' : 'lookup',
+                  required: !childRel.restrictedDelete // If not restrictable, it's required
+                });
+
+                // Queue child object for processing if not already done
+                if (!processedObjects.has(childRel.childSObject) && !objectsToProcess.has(childRel.childSObject)) {
                   objectsToProcess.set(childRel.childSObject, currentDepth + 1);
                 }
               }
@@ -115,8 +128,16 @@ async function generateERD(salesforce, rootObjects, maxDepth = 2, options = {}) 
     }
   }
 
-  // No hard limit on relationships - let user decide
-  const finalRelationships = relationships;
+  // Deduplicate relationships (we may have added from both parent and child sides)
+  const relationshipMap = new Map();
+  for (const rel of relationships) {
+    // Create a canonical key regardless of direction
+    const key = [rel.from, rel.to, rel.field].sort().join('|');
+    if (!relationshipMap.has(key)) {
+      relationshipMap.set(key, rel);
+    }
+  }
+  const finalRelationships = Array.from(relationshipMap.values());
 
   // Check if diagram may be too large for browser rendering
   const mayExceedBrowserLimit = processedObjects.size > WARN_OBJECTS || relationships.length > WARN_RELATIONSHIPS;

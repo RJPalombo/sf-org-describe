@@ -14,6 +14,7 @@ contextBridge.exposeInMainWorld('api', {
   // Export operations
   exportToExcel: (objectDescriptions) => ipcRenderer.invoke('export:excel', objectDescriptions),
   exportMermaid: (mermaidCode) => ipcRenderer.invoke('export:mermaid', mermaidCode),
+  exportDiagram: (data, format, options) => ipcRenderer.invoke('export:diagram', data, format, options),
 
   // ERD generation
   generateERD: (objectNames, depth, options) => ipcRenderer.invoke('erd:generate', objectNames, depth, options),
