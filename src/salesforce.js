@@ -1,13 +1,13 @@
 const jsforce = require('jsforce');
 const https = require('https');
 
-// Connected App Client ID - loaded from environment variable
-// Users can set SF_CLIENT_ID in a .env file or environment
-const CLIENT_ID = process.env.SF_CLIENT_ID;
+// Salesforce CLI's public Connected App Client ID
+// This is the same Client ID used by the official Salesforce CLI (sf/sfdx)
+// It works across all Salesforce orgs without requiring users to create their own Connected App
+const SFDX_CLIENT_ID = 'PlatformCLI';
 
-if (!CLIENT_ID) {
-  console.error('SF_CLIENT_ID environment variable is not set. Please create a .env file with your Connected App Client ID.');
-}
+// Allow override via environment variable for users who want their own Connected App
+const CLIENT_ID = process.env.SF_CLIENT_ID || SFDX_CLIENT_ID;
 
 let connection = null;
 let orgInfo = null;
