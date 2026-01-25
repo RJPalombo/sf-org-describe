@@ -862,6 +862,27 @@
       color: var(--text-secondary);
     }
 
+    .cancel-btn {
+      margin-top: 20px;
+      padding: 10px 24px;
+      background: transparent;
+      border: 1px solid var(--accent-danger);
+      border-radius: 6px;
+      color: var(--accent-danger);
+      font-size: 14px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .cancel-btn:hover {
+      background: var(--accent-danger);
+      color: white;
+    }
+
+    .cancel-btn.hidden {
+      display: none;
+    }
+
     /* Toast notifications */
     .toast {
       position: fixed;
@@ -1166,6 +1187,7 @@
   <div class="loading-overlay" id="loadingOverlay">
     <div class="spinner"></div>
     <div class="loading-text" id="loadingText">Loading...</div>
+    <button class="cancel-btn hidden" id="cancelBtn">Cancel</button>
   </div>
 
   <!-- Toast -->
@@ -1585,10 +1607,11 @@
 
       // Add click handlers
       objectList.querySelectorAll('.object-item').forEach(item => {
-        item.addEventListener('click', (e) => {
-          const name = item.dataset.name;
-          const checkbox = item.querySelector('input[type="checkbox"]');
+        const checkbox = item.querySelector('input[type="checkbox"]');
+        const name = item.dataset.name;
 
+        // Toggle selection state
+        const toggleSelection = () => {
           if (selectedObjects.has(name)) {
             selectedObjects.delete(name);
             item.classList.remove('selected');
@@ -1598,9 +1621,17 @@
             item.classList.add('selected');
             checkbox.checked = true;
           }
-
           updateSelectedCount();
+        };
+
+        // Handle checkbox click - stop propagation so row click doesn't double-toggle
+        checkbox.addEventListener('click', (e) => {
+          e.stopPropagation();
+          toggleSelection();
         });
+
+        // Handle row click
+        item.addEventListener('click', toggleSelection);
       });
     }
 
@@ -1624,20 +1655,32 @@
         return;
       }
 
-      showLoading('Fetching object metadata...');
+      showLoading('Fetching object metadata...', true);
 
       try {
         // First, describe all selected objects
         const descResult = await window.api.describeObjects(Array.from(selectedObjects));
 
+        if (isCancelled()) {
+          showToast('Export cancelled', 'warning');
+          hideLoading();
+          return;
+        }
+
         if (!descResult.success) {
           throw new Error(descResult.error);
         }
 
-        showLoading('Generating Excel file...');
+        showLoading('Generating Excel file...', true);
 
         // Export to Excel
         const exportResult = await window.api.exportToExcel(descResult.data);
+
+        if (isCancelled()) {
+          showToast('Export cancelled', 'warning');
+          hideLoading();
+          return;
+        }
 
         if (exportResult.success) {
           showToast('Excel file saved successfully!', 'success');
@@ -1664,10 +1707,17 @@
       const compact = document.getElementById('erdCompact').checked;
       const selectedOnly = document.getElementById('erdSelectedOnly').checked;
 
-      showLoading('Generating ERD (this may take a moment)...');
+      showLoading('Generating ERD (this may take a moment)...', true);
 
       try {
         const result = await window.api.generateERD(Array.from(selectedObjects), depth, { maxObjects, compact, selectedOnly });
+
+        // Check if cancelled
+        if (isCancelled()) {
+          showToast('ERD generation cancelled', 'warning');
+          hideLoading();
+          return;
+        }
 
         if (result.success) {
           currentMermaidCode = result.data.mermaidCode;
@@ -1934,14 +1984,35 @@
       hideLoading();
     }
 
+    // Cancellation support
+    let operationCancelled = false;
+    const cancelBtn = document.getElementById('cancelBtn');
+
+    cancelBtn.addEventListener('click', () => {
+      operationCancelled = true;
+      cancelBtn.classList.add('hidden');
+      loadingText.textContent = 'Cancelling...';
+    });
+
     // Loading helpers
-    function showLoading(text) {
+    function showLoading(text, cancellable = false) {
+      operationCancelled = false;
       loadingText.textContent = text;
       loadingOverlay.classList.add('visible');
+      if (cancellable) {
+        cancelBtn.classList.remove('hidden');
+      } else {
+        cancelBtn.classList.add('hidden');
+      }
     }
 
     function hideLoading() {
       loadingOverlay.classList.remove('visible');
+      cancelBtn.classList.add('hidden');
+    }
+
+    function isCancelled() {
+      return operationCancelled;
     }
 
     // Toast helper
