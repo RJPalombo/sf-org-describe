@@ -83,7 +83,7 @@
     "npmRebuild": false
   },
   "devDependencies": {
-    "electron": "^40.0.0",
+    "electron": "^40.7.0",
     "electron-builder": "^26.4.0"
   },
   "overrides": {
