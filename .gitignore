@@ -22,6 +22,7 @@ npm-debug.log*
 # Environment
 .env
 .env.local
+.sfdx/
 
 # Electron build
 *.dmg
