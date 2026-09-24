@@ -86,6 +86,12 @@ ipcMain.handle('auth:setClientId', async (event, clientId) => {
   return { success: true };
 });
 
+// Report which Client ID is in effect and where it came from
+ipcMain.handle('auth:getClientIdInfo', async () => {
+  const { clientId, source } = salesforce.getClientIdInfo();
+  return { source, isDefault: clientId === 'PlatformCLI' };
+});
+
 // Get connection status
 ipcMain.handle('auth:getStatus', async () => {
   return salesforce.getConnectionStatus();

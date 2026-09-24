@@ -9,8 +9,65 @@ const SFDX_CLIENT_ID = 'PlatformCLI';
 // Default from environment, can be overridden at runtime
 let customClientId = null;
 
+/**
+ * Resolve the Client ID along with where it came from, so auth failures can
+ * say which credential was actually used (UI setting, .env, or the default).
+ */
+function getClientIdInfo() {
+  if (customClientId) {
+    return { clientId: customClientId, source: 'Advanced Settings in the app' };
+  }
+  if (process.env.SF_CLIENT_ID) {
+    return { clientId: process.env.SF_CLIENT_ID, source: 'SF_CLIENT_ID in the .env file' };
+  }
+  return { clientId: SFDX_CLIENT_ID, source: 'built-in default (PlatformCLI)' };
+}
+
 function getClientId() {
-  return customClientId || process.env.SF_CLIENT_ID || SFDX_CLIENT_ID;
+  return getClientIdInfo().clientId;
+}
+
+/**
+ * Show enough of a Client ID to identify it without logging the whole value
+ */
+function maskClientId(clientId) {
+  if (!clientId) return '(empty)';
+  if (clientId.length <= 16) return clientId;
+  return `${clientId.slice(0, 8)}…${clientId.slice(-4)} (${clientId.length} chars)`;
+}
+
+/**
+ * Turn a bare Salesforce OAuth error into something actionable.
+ * Salesforce returns things like "client identifier invalid" with no clue
+ * about which Client ID was sent or which endpoint rejected it.
+ */
+function buildAuthError(result, loginUrl) {
+  const { clientId, source } = getClientIdInfo();
+  const host = new URL(loginUrl).host;
+  const code = result.error || 'unknown_error';
+  const description = result.error_description || code;
+
+  let hint;
+  if (code === 'invalid_client_id') {
+    hint = `${host} does not recognize this Consumer Key. Check that the Connected App exists and that you picked the right environment (Production uses login.salesforce.com, Sandbox uses test.salesforce.com). A newly created Connected App can take ~10 minutes to propagate.`;
+  } else if (/device flow is not enabled/i.test(description)) {
+    hint = `The Connected App exists but does not allow the device flow. In Setup → App Manager → your app → Edit → OAuth Settings, enable "Enable Device Flow", then save and wait ~10 minutes.`;
+  } else if (code === 'invalid_client') {
+    hint = `The Connected App rejected the request. If it requires a Consumer Secret, this device flow cannot use it — create an app configured for the device flow instead.`;
+  }
+
+  const lines = [
+    `${description} (${code})`,
+    ``,
+    `Client ID: ${maskClientId(clientId)}`,
+    `Source:    ${source}`,
+    `Endpoint:  https://${host}/services/oauth2/token`
+  ];
+  if (hint) lines.push(``, hint);
+
+  const error = new Error(lines.join('\n'));
+  error.details = { code, description, clientIdSource: source, clientIdMasked: maskClientId(clientId), host };
+  return error;
 }
 
 /**
@@ -29,7 +86,11 @@ let orgInfo = null;
  */
 async function startDeviceFlow(loginUrl = 'https://login.salesforce.com') {
   return new Promise((resolve, reject) => {
-    const postData = `response_type=device_code&client_id=${getClientId()}&scope=api refresh_token`;
+    const postData = new URLSearchParams({
+      response_type: 'device_code',
+      client_id: getClientId(),
+      scope: 'api refresh_token'
+    }).toString();
 
     const url = new URL(loginUrl);
     const options = {
@@ -50,7 +111,7 @@ async function startDeviceFlow(loginUrl = 'https://login.salesforce.com') {
         try {
           const result = JSON.parse(data);
           if (result.error) {
-            reject(new Error(result.error_description || result.error));
+            reject(buildAuthError(result, loginUrl));
           } else {
             resolve({
               deviceCode: result.device_code,
@@ -77,7 +138,11 @@ async function startDeviceFlow(loginUrl = 'https://login.salesforce.com') {
  */
 async function pollDeviceFlow(deviceCode, loginUrl = 'https://login.salesforce.com') {
   return new Promise((resolve, reject) => {
-    const postData = `grant_type=device&client_id=${getClientId()}&code=${deviceCode}`;
+    const postData = new URLSearchParams({
+      grant_type: 'device',
+      client_id: getClientId(),
+      code: deviceCode
+    }).toString();
 
     const url = new URL(loginUrl);
     const options = {
@@ -100,7 +165,7 @@ async function pollDeviceFlow(deviceCode, loginUrl = 'https://login.salesforce.c
           if (result.error === 'authorization_pending') {
             reject(new Error('authorization_pending'));
           } else if (result.error) {
-            reject(new Error(result.error_description || result.error));
+            reject(buildAuthError(result, loginUrl));
           } else {
             // Success! Create connection
             connection = new jsforce.Connection({
@@ -223,6 +288,7 @@ function getConnection() {
 }
 
 module.exports = {
+  getClientIdInfo,
   startDeviceFlow,
   pollDeviceFlow,
   disconnect,

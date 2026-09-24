@@ -7,6 +7,7 @@ contextBridge.exposeInMainWorld('api', {
   disconnect: () => ipcRenderer.invoke('auth:disconnect'),
   getAuthStatus: () => ipcRenderer.invoke('auth:getStatus'),
   setClientId: (clientId) => ipcRenderer.invoke('auth:setClientId', clientId),
+  getClientIdInfo: () => ipcRenderer.invoke('auth:getClientIdInfo'),
 
   // Salesforce operations
   getObjects: () => ipcRenderer.invoke('sf:getObjects'),

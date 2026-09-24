@@ -291,13 +291,19 @@
       flex-direction: column;
     }
 
+    /* Connect tab scrolls when its content (e.g. expanded settings) is tall */
+    #tab-connect.active {
+      overflow-y: auto;
+    }
+
     /* Connection panel */
     .connection-panel {
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      height: 100%;
+      min-height: 100%;
+      flex-shrink: 0;
       padding: 40px;
       text-align: center;
     }
@@ -358,6 +364,44 @@
     .connect-btn:disabled {
       opacity: 0.5;
       cursor: not-allowed;
+    }
+
+    /* Auth error panel - stays put instead of vanishing like a toast */
+    .auth-error {
+      margin-top: 24px;
+      max-width: 560px;
+      width: 100%;
+      padding: 16px 18px;
+      background: rgba(239, 68, 68, 0.08);
+      border: 1px solid var(--accent-danger);
+      border-radius: 8px;
+      text-align: left;
+    }
+
+    .auth-error.hidden {
+      display: none;
+    }
+
+    .auth-error h4 {
+      font-size: 14px;
+      margin-bottom: 10px;
+      color: var(--accent-danger);
+    }
+
+    .auth-error pre {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 12px;
+      line-height: 1.6;
+      color: var(--text-primary);
+      white-space: pre-wrap;
+      word-break: break-word;
+      margin: 0;
+    }
+
+    .client-id-source {
+      margin-top: 8px;
+      font-size: 12px;
+      color: var(--text-secondary);
     }
 
     /* Settings Section */
@@ -1184,6 +1228,11 @@
               <button class="open-browser-btn" id="openBrowserBtn">Open Salesforce Login</button>
             </div>
 
+            <div class="auth-error hidden" id="authError">
+              <h4>Authentication failed</h4>
+              <pre id="authErrorDetail"></pre>
+            </div>
+
             <!-- Custom Connected App Settings -->
             <div class="settings-section">
               <button class="settings-toggle" id="settingsToggle">
@@ -1203,6 +1252,7 @@
                   <label for="customClientId">Connected App Client ID (Consumer Key)</label>
                   <input type="text" id="customClientId" placeholder="Enter your Client ID (leave empty for default)">
                   <button class="settings-save-btn" id="saveClientIdBtn">Save</button>
+                  <div class="client-id-source" id="clientIdSource"></div>
                 </div>
                 <div class="settings-help">
                   <p><strong>How to create a Connected App:</strong></p>
@@ -1557,6 +1607,7 @@
     const settingsContent = document.getElementById('settingsContent');
     const customClientIdInput = document.getElementById('customClientId');
     const saveClientIdBtn = document.getElementById('saveClientIdBtn');
+    const clientIdSourceEl = document.getElementById('clientIdSource');
 
     // Load saved client ID
     const savedClientId = localStorage.getItem('sf_custom_client_id');
@@ -1567,6 +1618,12 @@
     settingsToggle.addEventListener('click', () => {
       settingsToggle.classList.toggle('expanded');
       settingsContent.classList.toggle('hidden');
+      if (!settingsContent.classList.contains('hidden')) {
+        // Bring the newly revealed panel into view in the scrollable tab
+        requestAnimationFrame(() => {
+          settingsContent.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        });
+      }
     });
 
     saveClientIdBtn.addEventListener('click', async () => {
@@ -1574,10 +1631,12 @@
       if (clientId) {
         localStorage.setItem('sf_custom_client_id', clientId);
         await window.api.setClientId(clientId);
+        await refreshClientIdSource();
         showToast('Client ID saved. It will be used for future connections.', 'success');
       } else {
         localStorage.removeItem('sf_custom_client_id');
         await window.api.setClientId(null);
+        await refreshClientIdSource();
         showToast('Custom Client ID cleared. Using default.', 'success');
       }
     });
@@ -1659,8 +1718,30 @@
       }
     });
 
+    // Auth error panel
+    const authErrorEl = document.getElementById('authError');
+    const authErrorDetailEl = document.getElementById('authErrorDetail');
+
+    function showAuthError(message) {
+      authErrorDetailEl.textContent = message;
+      authErrorEl.classList.remove('hidden');
+      authErrorEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+
+    function clearAuthError() {
+      authErrorEl.classList.add('hidden');
+      authErrorDetailEl.textContent = '';
+    }
+
+    // Show which Client ID the next connection will actually use
+    async function refreshClientIdSource() {
+      const info = await window.api.getClientIdInfo();
+      clientIdSourceEl.textContent = `Currently using: ${info.source}`;
+    }
+
     // Start authentication
     async function startAuth() {
+      clearAuthError();
       showLoading('Starting authentication...');
       connectBtn.disabled = true;
 
@@ -1678,12 +1759,14 @@
           startPolling(result.data.interval);
         } else {
           logError('Auth start', { message: result.error });
-          showToast('Failed to start auth: ' + result.error, 'error');
+          showAuthError(result.error);
+          showToast('Failed to start auth - see details below', 'error');
           connectBtn.disabled = false;
         }
       } catch (error) {
         logError('Auth start exception', error);
-        showToast('Error: ' + error.message, 'error');
+        showAuthError(error.message);
+        showToast('Error - see details below', 'error');
         connectBtn.disabled = false;
       }
 
@@ -1712,7 +1795,8 @@
             // Error (not just pending)
             clearInterval(pollInterval);
             logError('Auth polling', { message: result.error });
-            showToast('Auth failed: ' + result.error, 'error');
+            showAuthError(result.error);
+            showToast('Auth failed - see details below', 'error');
             deviceFlowInfo.classList.add('hidden');
             connectBtn.classList.remove('hidden');
             connectBtn.disabled = false;
@@ -2232,6 +2316,7 @@
 
     // Check initial connection status
     async function init() {
+      refreshClientIdSource();
       const status = await window.api.getAuthStatus();
       if (status.connected) {
         updateConnectionStatus(true, status.orgInfo);
