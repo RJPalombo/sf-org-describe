@@ -109,6 +109,21 @@ Output files will be in the `dist/` folder:
 6. Use the **Excel Export** tab to download metadata
 7. Use the **ERD Generator** tab to create relationship diagrams
 
+## Command Line (CLI)
+
+The `sfod` command gives you the same exports from a terminal. Use it interactively, from scripts, or from AI agents. You log in to each org once under an alias, much like Salesforce CLI. The alias remembers the domain and Client ID, and later commands run without a browser.
+
+```bash
+npm link                                   # installs the `sfod` command
+
+sfod login --alias prod --domain acme.my.salesforce.com --client-id 3MVG9...
+sfod export excel -o prod --objects-file scope.txt -f metadata.xlsx
+sfod erd -o prod --objects Opportunity --depth 2 -f opportunity-erd.md
+sfod                                       # interactive shell
+```
+
+Every command supports `--json` output and returns meaningful exit codes. See the **[CLI guide](docs/CLI.md)** for all commands, the agent login flow, and a scheduled-export example.
+
 ## Tech Stack
 
 - **Electron** - Cross-platform desktop framework

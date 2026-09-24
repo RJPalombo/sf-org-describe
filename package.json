@@ -1,15 +1,19 @@
 {
   "name": "sf-org-describe",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Salesforce Org Documentation Tool - Generate Excel metadata exports and ERD diagrams",
   "main": "src/main.js",
+  "bin": {
+    "sfod": "bin/sfod.js"
+  },
   "scripts": {
     "start": "unset ELECTRON_RUN_AS_NODE && electron .",
     "pack": "electron-builder --dir",
     "dist": "electron-builder",
     "dist:mac": "electron-builder --mac",
     "dist:win": "electron-builder --win",
-    "dist:all": "electron-builder --mac --win"
+    "dist:all": "electron-builder --mac --win",
+    "cli": "node bin/sfod.js"
   },
   "keywords": [
     "salesforce",

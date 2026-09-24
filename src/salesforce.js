@@ -8,6 +8,7 @@ const SFDX_CLIENT_ID = 'PlatformCLI';
 
 // Default from environment, can be overridden at runtime
 let customClientId = null;
+let customClientIdSource = null;
 
 /**
  * Resolve the Client ID along with where it came from, so auth failures can
@@ -15,7 +16,7 @@ let customClientId = null;
  */
 function getClientIdInfo() {
   if (customClientId) {
-    return { clientId: customClientId, source: 'Advanced Settings in the app' };
+    return { clientId: customClientId, source: customClientIdSource || 'Advanced Settings in the app' };
   }
   if (process.env.SF_CLIENT_ID) {
     return { clientId: process.env.SF_CLIENT_ID, source: 'SF_CLIENT_ID in the .env file' };
@@ -71,10 +72,11 @@ function buildAuthError(result, loginUrl) {
 }
 
 /**
- * Set a custom client ID (from UI settings)
+ * Set a custom client ID (from UI settings, or from the CLI with its own source label)
  */
-function setClientId(clientId) {
+function setClientId(clientId, source) {
   customClientId = clientId || null;
+  customClientIdSource = source || null;
 }
 
 let connection = null;
@@ -210,6 +212,14 @@ function disconnect() {
 }
 
 /**
+ * Use an already-authenticated connection (the CLI restores saved logins this way)
+ */
+function setConnection(conn, info) {
+  connection = conn;
+  orgInfo = info;
+}
+
+/**
  * Get connection status
  */
 function getConnectionStatus() {
@@ -297,5 +307,6 @@ module.exports = {
   describeObjects,
   describeObject,
   getConnection,
+  setConnection,
   setClientId
 };
