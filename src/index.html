@@ -345,6 +345,38 @@
       background: rgba(79, 70, 229, 0.1);
     }
 
+    .custom-domain-field {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-bottom: 24px;
+      max-width: 400px;
+    }
+
+    .custom-domain-field.hidden {
+      display: none;
+    }
+
+    .custom-domain-field label {
+      font-size: 13px;
+      color: var(--text-secondary);
+    }
+
+    .custom-domain-field input {
+      padding: 10px 12px;
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      color: var(--text-primary);
+      font-size: 14px;
+      font-family: monospace;
+    }
+
+    .custom-domain-field input:focus {
+      outline: none;
+      border-color: var(--accent-primary);
+    }
+
     .connect-btn {
       padding: 14px 32px;
       background: var(--accent-primary);
@@ -1216,6 +1248,12 @@
             <div class="env-selector">
               <button class="env-btn selected" data-env="https://login.salesforce.com">Production</button>
               <button class="env-btn" data-env="https://test.salesforce.com">Sandbox</button>
+              <button class="env-btn" data-env="custom">Custom Domain</button>
+            </div>
+
+            <div class="custom-domain-field hidden" id="customDomainField">
+              <label for="customDomainInput">My Domain URL</label>
+              <input type="text" id="customDomainInput" placeholder="yourdomain.my.salesforce.com">
             </div>
 
             <button class="connect-btn" id="connectBtn">Connect to Salesforce</button>
@@ -1451,6 +1489,7 @@
 
     // State
     let selectedLoginUrl = 'https://login.salesforce.com';
+    let authLoginUrl = null; // Resolved login URL for the in-progress device flow
     let deviceCode = null;
     let pollInterval = null;
     let allObjects = [];
@@ -1589,8 +1628,41 @@
         document.querySelectorAll('.env-btn').forEach(b => b.classList.remove('selected'));
         btn.classList.add('selected');
         selectedLoginUrl = btn.dataset.env;
+        customDomainField.classList.toggle('hidden', selectedLoginUrl !== 'custom');
+        if (selectedLoginUrl === 'custom') customDomainInput.focus();
       });
     });
+
+    // Custom domain (My Domain) login URL
+    const customDomainField = document.getElementById('customDomainField');
+    const customDomainInput = document.getElementById('customDomainInput');
+    try {
+      customDomainInput.value = localStorage.getItem('sf_custom_domain') || '';
+    } catch (e) {}
+
+    // Accepts "acme.my.salesforce.com", "https://acme.my.salesforce.com/", or a full
+    // Lightning URL and returns just the https origin, or null if unusable
+    function normalizeCustomDomain(value) {
+      const trimmed = value.trim();
+      if (!trimmed) return null;
+      try {
+        const url = new URL(/^https?:\/\//i.test(trimmed) ? trimmed : 'https://' + trimmed);
+        return 'https://' + url.hostname.replace(/\.lightning\.force\.com$/i, '.my.salesforce.com');
+      } catch (e) {
+        return null;
+      }
+    }
+
+    function resolveLoginUrl() {
+      if (selectedLoginUrl !== 'custom') return selectedLoginUrl;
+      const loginUrl = normalizeCustomDomain(customDomainInput.value);
+      if (loginUrl) {
+        try {
+          localStorage.setItem('sf_custom_domain', customDomainInput.value.trim());
+        } catch (e) {}
+      }
+      return loginUrl;
+    }
 
     // Filter buttons
     document.querySelectorAll('.filter-btn').forEach(btn => {
@@ -1742,11 +1814,19 @@
     // Start authentication
     async function startAuth() {
       clearAuthError();
+
+      authLoginUrl = resolveLoginUrl();
+      if (!authLoginUrl) {
+        showToast('Enter your My Domain URL, e.g. yourdomain.my.salesforce.com', 'error');
+        customDomainInput.focus();
+        return;
+      }
+
       showLoading('Starting authentication...');
       connectBtn.disabled = true;
 
       try {
-        const result = await window.api.startDeviceFlow(selectedLoginUrl);
+        const result = await window.api.startDeviceFlow(authLoginUrl);
 
         if (result.success) {
           deviceCode = result.data.deviceCode;
@@ -1780,7 +1860,7 @@
 
       pollInterval = setInterval(async () => {
         try {
-          const result = await window.api.pollDeviceFlow(deviceCode, selectedLoginUrl);
+          const result = await window.api.pollDeviceFlow(deviceCode, authLoginUrl);
 
           if (result.success) {
             // Auth successful!
