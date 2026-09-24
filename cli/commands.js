@@ -7,8 +7,8 @@ const path = require('path');
 const salesforce = require('../src/salesforce');
 const excelExport = require('../src/excel-export');
 const erdGenerator = require('../src/erd-generator');
-const auth = require('./auth');
-const store = require('./store');
+const auth = require('../src/org-auth');
+const store = require('../src/org-store');
 
 const DESCRIBE_BATCH_SIZE = 25;
 
@@ -190,6 +190,26 @@ function logout(flags) {
   return { alias: org.alias, removed: true };
 }
 
+// Friendly names for the shared settings keys
+const CONFIG_KEYS = { 'client-id': 'clientId', domain: 'customDomain' };
+
+function config(action = 'list', key, value) {
+  if (action !== 'list') {
+    if (!CONFIG_KEYS[key]) throw usageError(`Unknown setting "${key || ''}". Settings: ${Object.keys(CONFIG_KEYS).join(', ')}`);
+    if (action === 'set') {
+      if (!value) throw usageError(`Usage: sfod config set ${key} <value>`);
+      if (key === 'domain' && !auth.normalizeDomain(value)) throw usageError(`"${value}" is not a valid domain`);
+      store.saveSettings({ [CONFIG_KEYS[key]]: value });
+    } else if (action === 'unset') {
+      store.saveSettings({ [CONFIG_KEYS[key]]: null });
+    } else {
+      throw usageError('Usage: sfod config list | set <key> <value> | unset <key>');
+    }
+  }
+  const settings = store.getSettings();
+  return { 'client-id': settings.clientId || null, domain: settings.customDomain || null };
+}
+
 function setDefault(alias) {
   if (!alias) throw usageError('Usage: sfod org set-default <alias>');
   store.setDefaultOrg(alias);
@@ -206,5 +226,6 @@ module.exports = {
   listOrgs,
   displayOrg,
   logout,
-  setDefault
+  setDefault,
+  config
 };

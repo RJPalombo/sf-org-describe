@@ -8,6 +8,8 @@ The `sfod` command gives you the desktop app's metadata export and ERD features 
 
 Like Salesforce CLI aliases, you log in to an org **once** and save it under an alias. The alias keeps the login domain, the Client ID (Consumer Key), and a refresh token, so later commands run without a browser.
 
+The CLI and the desktop app **share the same saved orgs and settings**. An org you log in to in the app can be used right away with `sfod -o <alias>`, and an org saved with `sfod login` shows up on the app's Connect tab.
+
 - [Install](#install)
 - [Quick start](#quick-start)
 - [Logging in and saved orgs](#logging-in-and-saved-orgs)
@@ -16,6 +18,7 @@ Like Salesforce CLI aliases, you log in to an org **once** and save it under an 
 - [Interactive shell](#interactive-shell)
 - [Automation and agents](#automation-and-agents)
 - [Example: keep an integration-mapping workbook current](#example-keep-an-integration-mapping-workbook-current)
+- [Shared defaults (`sfod config`)](#shared-defaults-sfod-config)
 - [Where credentials are stored](#where-credentials-are-stored)
 - [Troubleshooting](#troubleshooting)
 
@@ -79,12 +82,13 @@ sfod login --alias <name> [--domain <my-domain> | --sandbox] [--client-id <key>]
 
 Each alias keeps the **login domain** and the **Client ID** it was created with. Running `sfod login --alias prod` again without flags reuses both, so you don't retype a My Domain or a long Consumer Key. Passing a flag replaces the saved value for that alias.
 
-When no Client ID is saved with the alias, `sfod` checks these sources in order:
+To pick the Client ID for a login, `sfod` checks these sources in order:
 
 1. `--client-id` flag
 2. The value saved with the alias
-3. `SF_CLIENT_ID` in the repository's `.env` file or your environment
-4. The built-in default, `PlatformCLI`
+3. The shared default Client ID, set with `sfod config set client-id` or in the app's **Advanced Settings** (see [Shared defaults](#shared-defaults-sfod-config))
+4. `SF_CLIENT_ID` in the repository's `.env` file or your environment
+5. The built-in default, `PlatformCLI`
 
 Without `--domain` or `--sandbox`, a new alias logs in through `login.salesforce.com`.
 
@@ -316,13 +320,32 @@ When cron can't find `sfod`, use the full path from `which sfod`, or run `node /
 
 An agent can do the same thing on request. For example, you can ask it to *"pull the latest Salesforce metadata for the ERP integration objects and update the mapping sheet."* It runs the export with `--json`, reads `result.outputFile` from the output, and continues with the next steps.
 
+## Shared defaults (`sfod config`)
+
+Two defaults apply to **new** logins in both the CLI and the desktop app:
+
+| Key | Used for | Same as in the desktop app |
+| --- | --- | --- |
+| `client-id` | The Consumer Key, when the alias has none saved and `--client-id` isn't given | **Advanced Settings → Client ID** |
+| `domain` | The suggested My Domain in the interactive shell and the app's Custom Domain field | The **Custom Domain** field (the app remembers the last one you used) |
+
+```bash
+sfod config list
+sfod config set client-id 3MVG9...
+sfod config set domain acme.my.salesforce.com
+sfod config unset client-id
+```
+
+Scripted `sfod login` doesn't pick up the `domain` default on its own. Pass `--domain` so a script never logs in to an org you didn't intend.
+
 ## Where credentials are stored
 
-Saved orgs are kept in `~/.sf-org-describe/orgs.json`. Set `SFOD_HOME` to use a different folder, for example a separate folder per CI job.
+Saved orgs and shared defaults are kept in `~/.sf-org-describe/orgs.json`, which the CLI and the desktop app both read and write. Set `SFOD_HOME` to use a different folder, for example a separate folder per CI job. The desktop app follows `SFOD_HOME` too when it's started from a shell where the variable is set.
 
 - The file is created with permissions `600`, so only your user can read it. It contains each org's **access and refresh tokens**, so treat it like a password file. Don't commit it or copy it to shared locations.
 - `sfod org logout -o <alias>` deletes an org's tokens from the file. To also revoke access on the Salesforce side, go to **Setup → Connected Apps OAuth Usage** or the user's **OAuth Connected Apps** list.
-- The CLI and the desktop app keep separate settings. Logging in with one does not log you in with the other.
+- The desktop app lists the same saved orgs on its Connect tab. Removing an org there (**×**) also removes it for the CLI, and the reverse.
+- Earlier versions of the desktop app kept the Client ID and Custom Domain in the app's own storage. Version 1.2.0 moves them to this file the first time it opens.
 
 ## Troubleshooting
 

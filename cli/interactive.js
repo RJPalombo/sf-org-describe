@@ -3,9 +3,9 @@
  * After each action it prints the equivalent sfod command so it can be scripted.
  */
 const readline = require('readline/promises');
-const auth = require('./auth');
+const auth = require('../src/org-auth');
 const commands = require('./commands');
-const store = require('./store');
+const store = require('../src/org-store');
 const salesforce = require('../src/salesforce');
 
 let rl;
@@ -52,11 +52,12 @@ async function login() {
   if (environment === 'sandbox') options.sandbox = true;
   if (environment === 'production') options.domain = 'login.salesforce.com';
   if (environment === 'custom') {
-    options.domain = await ask('My Domain', saved && !/(login|test)\.salesforce\.com/.test(saved.loginUrl) ? saved.loginUrl.replace('https://', '') : undefined);
+    const savedDomain = saved && !/(login|test)\.salesforce\.com/.test(saved.loginUrl) ? saved.loginUrl.replace('https://', '') : null;
+    options.domain = await ask('My Domain', savedDomain || store.getSettings().customDomain);
   }
 
   const current = auth.resolveClientId(null, saved);
-  const clientId = await ask(`Client ID (Enter keeps ${current.clientId === 'PlatformCLI' ? 'the default PlatformCLI' : 'the saved one'})`);
+  const clientId = await ask(`Client ID (Enter keeps the current one, from ${current.source})`);
   if (clientId) options.clientId = clientId;
 
   options.setDefault = !store.getDefaultOrg() || (await ask('Make this the default org? (y/n)', 'n')).toLowerCase().startsWith('y');

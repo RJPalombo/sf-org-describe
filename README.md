@@ -102,12 +102,15 @@ Output files will be in the `dist/` folder:
 ## Usage
 
 1. Launch the application
-2. Select **Production** or **Sandbox**
-3. Click **Connect to Salesforce**
-4. Enter the displayed code on the Salesforce login page
-5. Once connected, select objects from the sidebar
-6. Use the **Excel Export** tab to download metadata
-7. Use the **ERD Generator** tab to create relationship diagrams
+2. To reconnect to an org you've used before, click **Connect** next to it under **Saved orgs**. No login is needed. Otherwise:
+   - Select **Production**, **Sandbox**, or **Custom Domain**
+   - Optionally enter an alias under **Save as**, such as `prod`
+   - Click **Connect to Salesforce** and enter the displayed code on the Salesforce login page
+3. Once connected, select objects from the sidebar
+4. Use the **Excel Export** tab to download metadata
+5. Use the **ERD Generator** tab to create relationship diagrams
+
+Saved orgs, the Client ID, and the Custom Domain are stored in `~/.sf-org-describe/orgs.json`. The app and the `sfod` CLI share this file, so an org saved in one is available in the other.
 
 ## Command Line (CLI)
 

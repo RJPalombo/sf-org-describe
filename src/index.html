@@ -382,6 +382,111 @@
       border-color: var(--accent-primary);
     }
 
+    .saved-orgs {
+      width: 100%;
+      max-width: 480px;
+      margin-bottom: 8px;
+      text-align: left;
+    }
+
+    .saved-orgs.hidden {
+      display: none;
+    }
+
+    .saved-orgs h3 {
+      font-size: 14px;
+      color: var(--text-secondary);
+      margin-bottom: 10px;
+    }
+
+    .saved-org {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 14px;
+      margin-bottom: 8px;
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+    }
+
+    .saved-org-info {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .saved-org-alias {
+      font-weight: 600;
+    }
+
+    .saved-org-default {
+      margin-left: 6px;
+      padding: 1px 6px;
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--accent-hover);
+      border: 1px solid var(--accent-primary);
+      border-radius: 4px;
+    }
+
+    .saved-org-detail {
+      font-size: 12px;
+      color: var(--text-secondary);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .saved-org-connect {
+      padding: 8px 16px;
+      background: var(--accent-primary);
+      border: none;
+      border-radius: 6px;
+      color: white;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .saved-org-connect:hover {
+      background: var(--accent-hover);
+    }
+
+    .saved-org-remove {
+      padding: 4px 8px;
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      font-size: 18px;
+      line-height: 1;
+      cursor: pointer;
+    }
+
+    .saved-org-remove:hover {
+      color: var(--accent-danger);
+    }
+
+    .saved-orgs-note {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .saved-orgs-divider {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin: 24px 0;
+      font-size: 13px;
+      color: var(--text-secondary);
+    }
+
+    .saved-orgs-divider::before,
+    .saved-orgs-divider::after {
+      content: '';
+      flex: 1;
+      border-top: 1px solid var(--border-color);
+    }
+
     .connect-btn {
       padding: 14px 32px;
       background: var(--accent-primary);
@@ -1248,7 +1353,14 @@
         <div class="tab-content active" id="tab-connect">
           <div class="connection-panel" id="connectionPanel">
             <h2>Connect to Salesforce</h2>
-            <p>Select your environment below, then click Connect. A code will appear that you'll enter on the Salesforce login page to authorize access.</p>
+            <p>Pick a saved org, or choose your environment and click Connect. A code will appear that you'll enter on the Salesforce login page to authorize access.</p>
+
+            <div class="saved-orgs hidden" id="savedOrgs">
+              <h3>Saved orgs</h3>
+              <div id="savedOrgList"></div>
+              <div class="saved-orgs-note">Shared with the sfod command line tool.</div>
+              <div class="saved-orgs-divider">or log in to a new org</div>
+            </div>
 
             <div class="env-selector">
               <button class="env-btn selected" data-env="https://login.salesforce.com">Production</button>
@@ -1260,6 +1372,12 @@
               <label for="customDomainInput">My Domain URL</label>
               <input type="text" id="customDomainInput" placeholder="yourdomain.my.salesforce.com">
               <span class="custom-domain-hint">Required when using an External Client App.</span>
+            </div>
+
+            <div class="custom-domain-field" id="aliasField">
+              <label for="aliasInput">Save as (alias)</label>
+              <input type="text" id="aliasInput" placeholder="e.g. prod (defaults to your username)">
+              <span class="custom-domain-hint">Reconnect later without logging in, here or with sfod -o &lt;alias&gt;.</span>
             </div>
 
             <button class="connect-btn" id="connectBtn">Connect to Salesforce</button>
@@ -1497,6 +1615,7 @@
     let selectedLoginUrl = 'https://login.salesforce.com';
     let authLoginUrl = null; // Resolved login URL for the in-progress device flow
     let deviceCode = null;
+    let authAlias = null; // Alias to save the in-progress login under
     let pollInterval = null;
     let allObjects = [];
     let selectedObjects = new Set();
@@ -1642,9 +1761,7 @@
     // Custom domain (My Domain) login URL
     const customDomainField = document.getElementById('customDomainField');
     const customDomainInput = document.getElementById('customDomainInput');
-    try {
-      customDomainInput.value = localStorage.getItem('sf_custom_domain') || '';
-    } catch (e) {}
+    const aliasInput = document.getElementById('aliasInput');
 
     // Accepts "acme.my.salesforce.com", "https://acme.my.salesforce.com/", or a full
     // Lightning URL and returns just the https origin, or null if unusable
@@ -1663,9 +1780,7 @@
       if (selectedLoginUrl !== 'custom') return selectedLoginUrl;
       const loginUrl = normalizeCustomDomain(customDomainInput.value);
       if (loginUrl) {
-        try {
-          localStorage.setItem('sf_custom_domain', customDomainInput.value.trim());
-        } catch (e) {}
+        window.api.saveSettings({ customDomain: customDomainInput.value.trim() });
       }
       return loginUrl;
     }
@@ -1687,11 +1802,6 @@
     const saveClientIdBtn = document.getElementById('saveClientIdBtn');
     const clientIdSourceEl = document.getElementById('clientIdSource');
 
-    // Load saved client ID
-    const savedClientId = localStorage.getItem('sf_custom_client_id');
-    if (savedClientId) {
-      customClientIdInput.value = savedClientId;
-    }
 
     settingsToggle.addEventListener('click', () => {
       settingsToggle.classList.toggle('expanded');
@@ -1707,22 +1817,121 @@
     saveClientIdBtn.addEventListener('click', async () => {
       const clientId = customClientIdInput.value.trim();
       if (clientId) {
-        localStorage.setItem('sf_custom_client_id', clientId);
         await window.api.setClientId(clientId);
         await refreshClientIdSource();
         showToast('Client ID saved. It will be used for future connections.', 'success');
       } else {
-        localStorage.removeItem('sf_custom_client_id');
         await window.api.setClientId(null);
         await refreshClientIdSource();
         showToast('Custom Client ID cleared. Using default.', 'success');
       }
     });
 
-    // Apply saved client ID on startup
-    if (savedClientId) {
-      window.api.setClientId(savedClientId);
+    // Client ID and My Domain live in ~/.sf-org-describe, shared with the sfod CLI.
+    // Older versions kept them in localStorage, so move those across once.
+    async function loadSharedSettings() {
+      let settings = await window.api.getSettings();
+      try {
+        const legacy = {};
+        const legacyClientId = localStorage.getItem('sf_custom_client_id');
+        const legacyDomain = localStorage.getItem('sf_custom_domain');
+        if (legacyClientId && !settings.clientId) legacy.clientId = legacyClientId;
+        if (legacyDomain && !settings.customDomain) legacy.customDomain = legacyDomain;
+        if (Object.keys(legacy).length) settings = await window.api.saveSettings(legacy);
+        localStorage.removeItem('sf_custom_client_id');
+        localStorage.removeItem('sf_custom_domain');
+      } catch (e) {
+        logError('Settings migration', e);
+      }
+      customClientIdInput.value = settings.clientId || '';
+      customDomainInput.value = settings.customDomain || '';
     }
+
+    // Saved orgs, shared with the sfod CLI
+    const savedOrgsEl = document.getElementById('savedOrgs');
+    const savedOrgListEl = document.getElementById('savedOrgList');
+
+    async function renderSavedOrgs() {
+      const result = await window.api.listOrgs();
+      if (!result.success) {
+        logError('Load saved orgs', { message: result.error });
+        return;
+      }
+      savedOrgListEl.replaceChildren(...result.data.map(buildSavedOrgRow));
+      savedOrgsEl.classList.toggle('hidden', result.data.length === 0);
+    }
+
+    function buildSavedOrgRow(org) {
+      const row = document.createElement('div');
+      row.className = 'saved-org';
+
+      const info = document.createElement('div');
+      info.className = 'saved-org-info';
+      const alias = document.createElement('div');
+      alias.className = 'saved-org-alias';
+      alias.textContent = org.alias;
+      if (org.isDefault) {
+        const badge = document.createElement('span');
+        badge.className = 'saved-org-default';
+        badge.textContent = 'default';
+        alias.appendChild(badge);
+      }
+      const detail = document.createElement('div');
+      detail.className = 'saved-org-detail';
+      detail.textContent = `${org.username} · ${(org.loginUrl || '').replace('https://', '')}`;
+      detail.title = detail.textContent;
+      info.append(alias, detail);
+
+      const connect = document.createElement('button');
+      connect.className = 'saved-org-connect';
+      connect.textContent = 'Connect';
+      connect.addEventListener('click', () => connectSavedOrg(org));
+
+      const remove = document.createElement('button');
+      remove.className = 'saved-org-remove';
+      remove.textContent = '×';
+      remove.title = `Forget ${org.alias} (also removes it from the sfod CLI)`;
+      remove.addEventListener('click', async () => {
+        if (!confirm(`Forget the saved login for "${org.alias}"?\n\nThis also removes it from the sfod command line tool.`)) return;
+        await window.api.removeOrg(org.alias);
+        renderSavedOrgs();
+      });
+
+      row.append(info, connect, remove);
+      return row;
+    }
+
+    async function connectSavedOrg(org) {
+      clearAuthError();
+      showLoading(`Connecting to ${org.alias}...`);
+      const result = await window.api.connectOrg(org.alias);
+      hideLoading();
+
+      if (result.success) {
+        updateConnectionStatus(true, result.data);
+        loadObjects();
+        return;
+      }
+
+      // Most likely the refresh token expired or was revoked: set up the form to log in again
+      logError('Saved org connect', { message: result.error });
+      prefillLogin(org);
+      showAuthError(`${result.error}\n\nThe saved login for "${org.alias}" no longer works. The form above is filled in with its settings; click Connect to log in again.`);
+      showToast('Saved login expired - log in again', 'error');
+    }
+
+    function prefillLogin(org) {
+      aliasInput.value = org.alias;
+      const env = /login\.salesforce\.com/.test(org.loginUrl) ? 'https://login.salesforce.com'
+        : /test\.salesforce\.com/.test(org.loginUrl) ? 'https://test.salesforce.com'
+        : 'custom';
+      if (env === 'custom') customDomainInput.value = org.loginUrl.replace('https://', '');
+      document.querySelector(`.env-btn[data-env="${env}"]`).click();
+    }
+
+    // Pick up orgs added or removed with the CLI while the app is open
+    window.addEventListener('focus', renderSavedOrgs);
+    document.querySelector('.tab[data-tab="connect"]').addEventListener('click', renderSavedOrgs);
 
     // Connect button
     connectBtn.addEventListener('click', startAuth);
@@ -1828,6 +2037,7 @@
         return;
       }
 
+      authAlias = aliasInput.value.trim() || null;
       showLoading('Starting authentication...');
       connectBtn.disabled = true;
 
@@ -1866,7 +2076,7 @@
 
       pollInterval = setInterval(async () => {
         try {
-          const result = await window.api.pollDeviceFlow(deviceCode, authLoginUrl);
+          const result = await window.api.pollDeviceFlow(deviceCode, authLoginUrl, authAlias);
 
           if (result.success) {
             // Auth successful!
@@ -1877,6 +2087,9 @@
 
             updateConnectionStatus(true, result.data);
             loadObjects();
+            renderSavedOrgs();
+            showToast(`Saved as "${result.data.alias}"`, 'success');
+            if (result.data.warning) showAuthError(result.data.warning);
           } else if (!result.pending) {
             // Error (not just pending)
             clearInterval(pollInterval);
@@ -2402,7 +2615,9 @@
 
     // Check initial connection status
     async function init() {
+      await loadSharedSettings();
       refreshClientIdSource();
+      renderSavedOrgs();
       const status = await window.api.getAuthStatus();
       if (status.connected) {
         updateConnectionStatus(true, status.orgInfo);

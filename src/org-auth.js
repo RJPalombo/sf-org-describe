@@ -1,10 +1,10 @@
 /**
- * CLI authentication: device-flow login into a saved alias, and reconnecting
- * to a saved alias with its refresh token (no browser needed).
+ * Saved-org authentication shared by the desktop app and the CLI: device-flow
+ * login into an alias, and reconnecting to an alias with its refresh token.
  */
 const jsforce = require('jsforce');
-const salesforce = require('../src/salesforce');
-const store = require('./store');
+const salesforce = require('./salesforce');
+const store = require('./org-store');
 
 const PRODUCTION_URL = 'https://login.salesforce.com';
 const SANDBOX_URL = 'https://test.salesforce.com';
@@ -39,12 +39,17 @@ function resolveLoginUrl({ domain, sandbox } = {}, saved) {
   return PRODUCTION_URL;
 }
 
+const SHARED_SETTINGS_SOURCE = 'shared settings (~/.sf-org-describe)';
+
 /**
- * Client ID precedence: --client-id flag, the alias's saved value, SF_CLIENT_ID, then PlatformCLI
+ * Client ID precedence: --client-id flag, the alias's saved value, the shared
+ * setting (desktop app Advanced Settings / sfod config), SF_CLIENT_ID, then PlatformCLI
  */
 function resolveClientId(flagValue, saved) {
   if (flagValue) return { clientId: flagValue, source: '--client-id flag' };
   if (saved && saved.clientId) return { clientId: saved.clientId, source: 'saved with this org alias' };
+  const shared = store.getSettings().clientId;
+  if (shared) return { clientId: shared, source: SHARED_SETTINGS_SOURCE };
   if (process.env.SF_CLIENT_ID) return { clientId: process.env.SF_CLIENT_ID, source: 'SF_CLIENT_ID environment variable' };
   return { clientId: DEFAULT_CLIENT_ID, source: 'built-in default (PlatformCLI)' };
 }
@@ -86,6 +91,32 @@ async function startLogin(alias, options = {}) {
 }
 
 /**
+ * Save the connection from a completed device flow under an alias, and keep
+ * the stored access token current when jsforce refreshes it
+ */
+function saveLogin(alias, orgInfo, { loginUrl, clientId, setDefault }) {
+  const conn = salesforce.getConnection();
+  store.saveOrg(alias, {
+    username: orgInfo.username,
+    orgId: orgInfo.orgId,
+    displayName: orgInfo.displayName,
+    instanceUrl: orgInfo.instanceUrl,
+    loginUrl,
+    clientId,
+    accessToken: conn.accessToken,
+    refreshToken: conn.refreshToken,
+    lastLogin: new Date().toISOString()
+  }, { makeDefault: setDefault });
+  conn.on('refresh', (accessToken) => store.saveOrg(alias, { accessToken }));
+
+  const result = { alias, ...orgInfo };
+  if (!conn.refreshToken) {
+    result.warning = 'Salesforce did not return a refresh token, so this login will stop working when the session expires. Make sure the Connected App grants the refresh_token scope.';
+  }
+  return result;
+}
+
+/**
  * Step 2 of the device flow: poll until the user approves, then save the alias
  */
 async function finishLogin(alias, { onWaiting } = {}) {
@@ -103,25 +134,9 @@ async function finishLogin(alias, { onWaiting } = {}) {
     }
     try {
       const orgInfo = await salesforce.pollDeviceFlow(pending.deviceCode, pending.loginUrl);
-      const conn = salesforce.getConnection();
-
-      store.saveOrg(alias, {
-        username: orgInfo.username,
-        orgId: orgInfo.orgId,
-        displayName: orgInfo.displayName,
-        instanceUrl: orgInfo.instanceUrl,
-        loginUrl: pending.loginUrl,
-        clientId: pending.clientId,
-        accessToken: conn.accessToken,
-        refreshToken: conn.refreshToken,
-        lastLogin: new Date().toISOString()
-      }, { makeDefault: pending.setDefault });
+      const result = saveLogin(alias, orgInfo, pending);
       store.clearPending(alias);
-
-      if (!conn.refreshToken) {
-        orgInfo.warning = 'Salesforce did not return a refresh token, so this login will stop working when the session expires. Make sure the Connected App grants the refresh_token scope.';
-      }
-      return { alias, ...orgInfo };
+      return result;
     } catch (error) {
       if (error.message !== 'authorization_pending') {
         store.clearPending(alias);
@@ -168,11 +183,22 @@ async function connect(aliasOrUsername) {
   return { alias: org.alias, ...orgInfo };
 }
 
+/**
+ * Tokens in a form that is safe to hand to the UI or print
+ */
+function publicOrg(org) {
+  const { accessToken, refreshToken, ...rest } = org;
+  return rest;
+}
+
 module.exports = {
+  SHARED_SETTINGS_SOURCE,
+  publicOrg,
   normalizeDomain,
   resolveLoginUrl,
   resolveClientId,
   startLogin,
   finishLogin,
+  saveLogin,
   connect
 };

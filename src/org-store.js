@@ -1,8 +1,9 @@
 /**
- * Saved org aliases for the CLI.
+ * Saved org aliases and settings, shared by the desktop app and the sfod CLI.
  *
  * Each alias remembers the login domain, the Client ID used to authenticate,
- * and the OAuth refresh token, so repeat runs don't need a browser login.
+ * and the OAuth refresh token, so repeat logins don't need a browser.
+ * "settings" holds the defaults both use for new logins (Client ID, My Domain).
  * Stored in ~/.sf-org-describe/orgs.json (override the folder with SFOD_HOME).
  */
 const fs = require('fs');
@@ -20,9 +21,9 @@ function storePath() {
 function load() {
   try {
     const data = JSON.parse(fs.readFileSync(storePath(), 'utf8'));
-    return { defaultOrg: data.defaultOrg || null, orgs: data.orgs || {}, pending: data.pending || {} };
+    return { defaultOrg: data.defaultOrg || null, orgs: data.orgs || {}, pending: data.pending || {}, settings: data.settings || {} };
   } catch (e) {
-    if (e.code === 'ENOENT') return { defaultOrg: null, orgs: {}, pending: {} };
+    if (e.code === 'ENOENT') return { defaultOrg: null, orgs: {}, pending: {}, settings: {} };
     throw new Error(`Could not read ${storePath()}: ${e.message}`);
   }
 }
@@ -100,6 +101,26 @@ function clearPending(alias) {
   save(data);
 }
 
+/**
+ * Shared defaults for new logins: { clientId, customDomain }
+ */
+function getSettings() {
+  return load().settings;
+}
+
+/**
+ * Merge settings; a null or empty value removes that setting
+ */
+function saveSettings(changes) {
+  const data = load();
+  for (const [key, value] of Object.entries(changes)) {
+    if (value === null || value === undefined || value === '') delete data.settings[key];
+    else data.settings[key] = value;
+  }
+  save(data);
+  return data.settings;
+}
+
 module.exports = {
   storePath,
   listOrgs,
@@ -111,5 +132,7 @@ module.exports = {
   getDefaultOrg,
   savePending,
   getPending,
-  clearPending
+  clearPending,
+  getSettings,
+  saveSettings
 };

@@ -10,9 +10,9 @@ const { parseArgs } = require('util');
 
 require('dotenv').config({ path: path.join(__dirname, '..', '.env'), quiet: true });
 
-const auth = require('../cli/auth');
+const auth = require('../src/org-auth');
 const commands = require('../cli/commands');
-const store = require('../cli/store');
+const store = require('../src/org-store');
 
 const HELP = `sfod - SF Org Describe CLI
 
@@ -24,6 +24,8 @@ Orgs
   org display           Check a saved login and show its details
   org set-default <a>   Make an alias the default org
   org logout            Remove a saved org
+  config list           Show shared defaults (also used by the desktop app)
+  config set <k> <v>    Set client-id or domain; "config unset <k>" clears it
 
 Metadata
   objects               List objects in the org
@@ -85,6 +87,13 @@ alias, so "sfod login --alias <name>" later reuses them.
       --max-fields <n>       Fields shown per object (default 8)
   -f, --output-file <path>   .md (fenced) or .mmd (raw). Default: print Mermaid to stdout
       --json                 JSON output`,
+  config: `sfod config list | set <key> <value> | unset <key>
+
+Shared defaults for new logins, used by both sfod and the desktop app:
+  client-id   Consumer Key used when an alias has none saved (the app's Advanced Settings)
+  domain      My Domain offered as the default Custom Domain (the app's Custom Domain field)
+
+  --json      JSON output`,
   org: `sfod org list | display | set-default <alias> | logout
 
   -o, --target-org <alias>   Org for display / logout (default: the default org)
@@ -239,6 +248,17 @@ async function run(argv) {
           throw commands.usageError(COMMAND_HELP.org);
       }
 
+    case 'config':
+      return output(commands.config(subcommand, arg, positionals[3]), (settings) => {
+        if (subcommand === 'list' || !subcommand) {
+          console.log(`client-id  ${settings['client-id'] || '(not set)'}`);
+          console.log(`domain     ${settings.domain || '(not set)'}`);
+          info(`\nStored in ${store.storePath()}`);
+        } else {
+          info(`Updated ${arg}`);
+        }
+      });
+
     case 'objects':
       return output(await commands.listObjects(flags), (objects) => {
         printTable(objects.map(o => ({ ...o, custom: o.custom ? 'yes' : '' })), [
@@ -280,7 +300,7 @@ async function run(argv) {
 run(process.argv.slice(2)).catch((error) => {
   const exitCode = error.exitCode || (error.code && String(error.code).startsWith('ERR_PARSE_ARGS') ? 2 : 1);
   let message = error.message;
-  if (process.argv[2] !== 'login' && /expired access\/refresh token|INVALID_SESSION_ID/i.test(message)) {
+  if (process.argv[2] !== 'login' && /expired access\/refresh token|INVALID_SESSION_ID|Unable to refresh session/i.test(message)) {
     message += '\n\nThe saved login is no longer valid. Log in again with: sfod login --alias <alias>';
   }
   if (process.argv.includes('--json')) {

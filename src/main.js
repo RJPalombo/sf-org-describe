@@ -6,6 +6,8 @@ const path = require('path');
 const salesforce = require('./salesforce');
 const excelExport = require('./excel-export');
 const erdGenerator = require('./erd-generator');
+const orgStore = require('./org-store');
+const orgAuth = require('./org-auth');
 
 let mainWindow;
 
@@ -49,11 +51,24 @@ app.on('activate', () => {
   }
 });
 
+// The Client ID in Advanced Settings lives in the store shared with the sfod CLI
+function applySharedClientId() {
+  const { clientId } = orgStore.getSettings();
+  salesforce.setClientId(clientId || null, orgAuth.SHARED_SETTINGS_SOURCE);
+}
+applySharedClientId();
+
+// Client ID for the device flow in progress, saved with the org once it completes
+let pendingLoginClientId = null;
+
 // IPC Handlers
 
 // Start OAuth Device Flow
 ipcMain.handle('auth:startDeviceFlow', async (event, loginUrl) => {
   try {
+    // Connecting to a saved org switches to that org's Client ID; new logins use the shared setting
+    applySharedClientId();
+    pendingLoginClientId = salesforce.getClientIdInfo().clientId;
     const result = await salesforce.startDeviceFlow(loginUrl);
     return { success: true, data: result };
   } catch (error) {
@@ -61,10 +76,14 @@ ipcMain.handle('auth:startDeviceFlow', async (event, loginUrl) => {
   }
 });
 
-// Poll for OAuth completion
-ipcMain.handle('auth:pollDeviceFlow', async (event, deviceCode, loginUrl) => {
+// Poll for OAuth completion; on success the org is saved under the alias (or username)
+ipcMain.handle('auth:pollDeviceFlow', async (event, deviceCode, loginUrl, alias) => {
   try {
-    const result = await salesforce.pollDeviceFlow(deviceCode, loginUrl);
+    const orgInfo = await salesforce.pollDeviceFlow(deviceCode, loginUrl);
+    const result = orgAuth.saveLogin(alias || orgInfo.username, orgInfo, {
+      loginUrl,
+      clientId: pendingLoginClientId
+    });
     return { success: true, data: result };
   } catch (error) {
     if (error.message === 'authorization_pending') {
@@ -80,10 +99,49 @@ ipcMain.handle('auth:disconnect', async () => {
   return { success: true };
 });
 
-// Set custom Client ID
+// Set custom Client ID (saved to the settings shared with the CLI)
 ipcMain.handle('auth:setClientId', async (event, clientId) => {
-  salesforce.setClientId(clientId);
+  orgStore.saveSettings({ clientId: clientId || null });
+  applySharedClientId();
   return { success: true };
+});
+
+// Shared settings: { clientId, customDomain }
+ipcMain.handle('settings:get', async () => {
+  return { ...orgStore.getSettings(), storePath: orgStore.storePath() };
+});
+
+ipcMain.handle('settings:set', async (event, changes) => {
+  const settings = orgStore.saveSettings(changes);
+  applySharedClientId();
+  return settings;
+});
+
+// Saved orgs (shared with the CLI), without their tokens
+ipcMain.handle('orgs:list', async () => {
+  try {
+    return { success: true, data: orgStore.listOrgs().map(orgAuth.publicOrg) };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+// Connect to a saved org with its refresh token - no browser needed
+ipcMain.handle('orgs:connect', async (event, alias) => {
+  try {
+    const orgInfo = await orgAuth.connect(alias);
+    // A cheap call that proves the saved login still works (refreshing the token if needed)
+    const conn = salesforce.getConnection();
+    await conn.request(`/services/data/v${conn.version}/limits`);
+    return { success: true, data: orgInfo };
+  } catch (error) {
+    salesforce.disconnect();
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('orgs:remove', async (event, alias) => {
+  return { success: orgStore.removeOrg(alias) };
 });
 
 // Report which Client ID is in effect and where it came from

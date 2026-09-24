@@ -3,11 +3,18 @@ const { contextBridge, ipcRenderer } = require('electron');
 contextBridge.exposeInMainWorld('api', {
   // Authentication
   startDeviceFlow: (loginUrl) => ipcRenderer.invoke('auth:startDeviceFlow', loginUrl),
-  pollDeviceFlow: (deviceCode, loginUrl) => ipcRenderer.invoke('auth:pollDeviceFlow', deviceCode, loginUrl),
+  pollDeviceFlow: (deviceCode, loginUrl, alias) => ipcRenderer.invoke('auth:pollDeviceFlow', deviceCode, loginUrl, alias),
   disconnect: () => ipcRenderer.invoke('auth:disconnect'),
   getAuthStatus: () => ipcRenderer.invoke('auth:getStatus'),
   setClientId: (clientId) => ipcRenderer.invoke('auth:setClientId', clientId),
   getClientIdInfo: () => ipcRenderer.invoke('auth:getClientIdInfo'),
+
+  // Saved orgs and settings (shared with the sfod CLI)
+  getSettings: () => ipcRenderer.invoke('settings:get'),
+  saveSettings: (changes) => ipcRenderer.invoke('settings:set', changes),
+  listOrgs: () => ipcRenderer.invoke('orgs:list'),
+  connectOrg: (alias) => ipcRenderer.invoke('orgs:connect', alias),
+  removeOrg: (alias) => ipcRenderer.invoke('orgs:remove', alias),
 
   // Salesforce operations
   getObjects: () => ipcRenderer.invoke('sf:getObjects'),
