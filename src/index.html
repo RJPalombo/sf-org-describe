@@ -372,6 +372,11 @@
       font-family: monospace;
     }
 
+    .custom-domain-hint {
+      font-size: 12px;
+      color: var(--text-secondary);
+    }
+
     .custom-domain-field input:focus {
       outline: none;
       border-color: var(--accent-primary);
@@ -1248,12 +1253,13 @@
             <div class="env-selector">
               <button class="env-btn selected" data-env="https://login.salesforce.com">Production</button>
               <button class="env-btn" data-env="https://test.salesforce.com">Sandbox</button>
-              <button class="env-btn" data-env="custom">Custom Domain</button>
+              <button class="env-btn" data-env="custom" title="Your org's My Domain. Required for External Client Apps.">Custom Domain</button>
             </div>
 
             <div class="custom-domain-field hidden" id="customDomainField">
               <label for="customDomainInput">My Domain URL</label>
               <input type="text" id="customDomainInput" placeholder="yourdomain.my.salesforce.com">
+              <span class="custom-domain-hint">Required when using an External Client App.</span>
             </div>
 
             <button class="connect-btn" id="connectBtn">Connect to Salesforce</button>

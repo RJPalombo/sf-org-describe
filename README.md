@@ -30,7 +30,7 @@ A cross-platform desktop application for documenting Salesforce orgs. Export com
 ### Authentication
 - OAuth 2.0 Device Flow - works with **any** Salesforce org
 - No per-org Connected App setup required
-- Supports both Production and Sandbox environments
+- Supports Production, Sandbox, and Custom Domain (My Domain) logins
 - Same authentication method used by Salesforce Data Loader
 
 ## Installation
@@ -75,6 +75,10 @@ To use this application, you need a Salesforce Connected App with Device Flow en
 6. **Enable for Device Flow** ← Critical!
 7. Save and wait a few minutes for it to propagate
 8. Copy the **Consumer Key** to your `.env` file as `SF_CLIENT_ID`
+
+### Using an External Client App
+
+External Client Apps also work (enable **Device Flow** under OAuth Settings → Flow Enablement), with one difference: a local External Client App only works in the org it was created in, and Salesforce must approve it through that org's My Domain. On the Connect tab, choose **Custom Domain** and enter your My Domain (e.g. `yourdomain.my.salesforce.com`). Logging in through Production or Sandbox fails after login with `OAUTH_APPROVAL_ERROR_GENERIC`.
 
 ## Building Distributables
 
