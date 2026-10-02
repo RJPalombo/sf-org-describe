@@ -4,7 +4,8 @@ contextBridge.exposeInMainWorld('api', {
   // Authentication
   startDeviceFlow: (loginUrl) => ipcRenderer.invoke('auth:startDeviceFlow', loginUrl),
   pollDeviceFlow: (deviceCode, loginUrl, alias) => ipcRenderer.invoke('auth:pollDeviceFlow', deviceCode, loginUrl, alias),
-  disconnect: () => ipcRenderer.invoke('auth:disconnect'),
+  browserLogin: (loginUrl, alias) => ipcRenderer.invoke('auth:browserLogin', loginUrl, alias),
+  disconnect: () =>ipcRenderer.invoke('auth:disconnect'),
   getAuthStatus: () => ipcRenderer.invoke('auth:getStatus'),
   setClientId: (clientId) => ipcRenderer.invoke('auth:setClientId', clientId),
   getClientIdInfo: () => ipcRenderer.invoke('auth:getClientIdInfo'),

@@ -54,7 +54,11 @@ function buildAuthError(result, loginUrl) {
   } else if (/device flow is not enabled/i.test(description)) {
     hint = `The Connected App exists but does not allow the device flow. In Setup → App Manager → your app → Edit → OAuth Settings, enable "Enable Device Flow", then save and wait ~10 minutes.`;
   } else if (code === 'invalid_client') {
-    hint = `The Connected App rejected the request. If it requires a Consumer Secret, this device flow cannot use it — create an app configured for the device flow instead.`;
+    hint = `The Connected App rejected the request. If it requires a Consumer Secret, this app cannot use it. Turn off "Require secret for Web Server Flow" (browser login) or use an app configured for the device flow.`;
+  } else if (/redirect_uri/i.test(code + description)) {
+    hint = `Add ${BROWSER_CALLBACK_URL} as a Callback URL in the app's OAuth Settings, then wait a few minutes.`;
+  } else if (/code challenge/i.test(description)) {
+    hint = `The app requires PKCE, which the device flow can't send. Use "Log in with browser" (sfod login --browser) instead.`;
   }
 
   const lines = [
@@ -88,12 +92,10 @@ let orgInfo = null;
  */
 async function startDeviceFlow(loginUrl = 'https://login.salesforce.com') {
   return new Promise((resolve, reject) => {
-    // No scope parameter: Salesforce grants the app's configured scopes. Requesting
-    // a scope the app doesn't have fails on the approval page with the unhelpful
-    // OAUTH_APPROVAL_ERROR_GENERIC instead of an invalid_scope error here.
     const postData = new URLSearchParams({
       response_type: 'device_code',
-      client_id: getClientId()
+      client_id: getClientId(),
+      scope: 'api refresh_token'
     }).toString();
 
     const url = new URL(loginUrl);
@@ -205,6 +207,142 @@ async function pollDeviceFlow(deviceCode, loginUrl = 'https://login.salesforce.c
   });
 }
 
+// Same callback the Salesforce CLI uses, so an app set up for sf works here too
+const BROWSER_CALLBACK_PORT = 1717;
+const BROWSER_CALLBACK_URL = `http://localhost:${BROWSER_CALLBACK_PORT}/OAuthRedirect`;
+const BROWSER_LOGIN_TIMEOUT_MS = 5 * 60 * 1000;
+
+// Only one browser login can hold the callback port at a time
+let activeBrowserLogin = null;
+
+function postToToken(loginUrl, params) {
+  return new Promise((resolve, reject) => {
+    const postData = new URLSearchParams(params).toString();
+    const req = https.request({
+      hostname: new URL(loginUrl).hostname,
+      port: 443,
+      path: '/services/oauth2/token',
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Content-Length': Buffer.byteLength(postData)
+      }
+    }, (res) => {
+      let data = '';
+      res.on('data', (chunk) => data += chunk);
+      res.on('end', () => {
+        try {
+          resolve(JSON.parse(data));
+        } catch (e) {
+          reject(new Error('Failed to parse response: ' + data));
+        }
+      });
+    });
+    req.on('error', reject);
+    req.write(postData);
+    req.end();
+  });
+}
+
+function callbackPage(title, message) {
+  return `<!doctype html><meta charset="utf-8"><title>${title}</title>
+<body style="font-family:-apple-system,Segoe UI,sans-serif;text-align:center;padding:60px">
+<h2>${title}</h2><p>${message}</p></body>`;
+}
+
+/**
+ * Log in with the OAuth web server flow plus PKCE: open the Salesforce login
+ * page in a browser and catch the redirect on localhost. Works with External
+ * Client Apps that require PKCE, which the device flow can't satisfy.
+ * The app needs http://localhost:1717/OAuthRedirect as a callback URL.
+ */
+async function browserLogin(loginUrl, { openUrl }) {
+  if (activeBrowserLogin) activeBrowserLogin.cancel();
+
+  const http = require('http');
+  const crypto = require('crypto');
+  const codeVerifier = crypto.randomBytes(32).toString('base64url');
+  const codeChallenge = crypto.createHash('sha256').update(codeVerifier).digest('base64url');
+  const state = crypto.randomBytes(16).toString('hex');
+  const clientId = getClientId();
+
+  const authorizeUrl = new URL('/services/oauth2/authorize', loginUrl);
+  authorizeUrl.search = new URLSearchParams({
+    response_type: 'code',
+    client_id: clientId,
+    redirect_uri: BROWSER_CALLBACK_URL,
+    scope: 'api refresh_token',
+    code_challenge: codeChallenge,
+    code_challenge_method: 'S256',
+    state
+  }).toString();
+
+  const code = await new Promise((resolve, reject) => {
+    const server = http.createServer((req, res) => {
+      const url = new URL(req.url, BROWSER_CALLBACK_URL);
+      res.setHeader('Connection', 'close');
+      if (url.pathname !== '/OAuthRedirect') {
+        res.writeHead(404).end();
+        return;
+      }
+      const error = url.searchParams.get('error');
+      if (error) {
+        const description = url.searchParams.get('error_description') || '';
+        res.writeHead(400, { 'Content-Type': 'text/html' }).end(callbackPage('Login failed', 'Return to SF Org Describe for details.'));
+        finish(buildAuthError({ error, error_description: description }, loginUrl));
+      } else if (url.searchParams.get('state') !== state) {
+        res.writeHead(400, { 'Content-Type': 'text/html' }).end(callbackPage('Login failed', 'The response did not match this login. Try again.'));
+        finish(new Error('Login response did not match the request (state mismatch). Try again.'));
+      } else {
+        res.writeHead(200, { 'Content-Type': 'text/html' }).end(callbackPage('Logged in', 'You can close this tab and return to SF Org Describe.'));
+        finish(null, url.searchParams.get('code'));
+      }
+    });
+
+    const timer = setTimeout(() => finish(new Error('Timed out waiting for the browser login. Try again.')), BROWSER_LOGIN_TIMEOUT_MS);
+    function finish(error, value) {
+      clearTimeout(timer);
+      // Drop keep-alive sockets too, or a retry's redirect can land on this finished server
+      server.close();
+      server.closeIdleConnections();
+      activeBrowserLogin = null;
+      error ? reject(error) : resolve(value);
+    }
+    activeBrowserLogin = { cancel: () => finish(new Error('Login cancelled')) };
+
+    server.on('error', (e) => finish(e.code === 'EADDRINUSE'
+      ? new Error(`Port ${BROWSER_CALLBACK_PORT} is in use (is another login, or the Salesforce CLI, waiting?). Close it and try again.`)
+      : e));
+    server.listen(BROWSER_CALLBACK_PORT, 'localhost', () => {
+      Promise.resolve(openUrl(authorizeUrl.toString())).catch(() => {});
+    });
+  });
+
+  const result = await postToToken(loginUrl, {
+    grant_type: 'authorization_code',
+    code,
+    client_id: clientId,
+    redirect_uri: BROWSER_CALLBACK_URL,
+    code_verifier: codeVerifier
+  });
+  if (result.error) throw buildAuthError(result, loginUrl);
+
+  connection = new jsforce.Connection({
+    instanceUrl: result.instance_url,
+    accessToken: result.access_token,
+    refreshToken: result.refresh_token,
+    oauth2: { clientId, loginUrl }
+  });
+  const identity = await connection.identity();
+  orgInfo = {
+    orgId: identity.organization_id,
+    username: identity.username,
+    displayName: identity.display_name,
+    instanceUrl: result.instance_url
+  };
+  return orgInfo;
+}
+
 /**
  * Disconnect from org
  */
@@ -303,6 +441,8 @@ module.exports = {
   getClientIdInfo,
   startDeviceFlow,
   pollDeviceFlow,
+  browserLogin,
+  BROWSER_CALLBACK_URL,
   disconnect,
   getConnectionStatus,
   getAllObjects,

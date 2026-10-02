@@ -149,6 +149,20 @@ async function finishLogin(alias, { onWaiting } = {}) {
 }
 
 /**
+ * Browser (web server + PKCE) login into an alias, for apps that require PKCE.
+ * openUrl opens the Salesforce login page; it resolves once the redirect arrives.
+ */
+async function browserLogin(alias, options = {}) {
+  const saved = store.getOrg(alias);
+  const loginUrl = resolveLoginUrl(options, saved);
+  const { clientId, source } = resolveClientId(options.clientId, saved);
+
+  salesforce.setClientId(clientId, source);
+  const orgInfo = await salesforce.browserLogin(loginUrl, { openUrl: options.openUrl });
+  return saveLogin(alias || orgInfo.username, orgInfo, { loginUrl, clientId, setDefault: !!options.setDefault });
+}
+
+/**
  * Connect to a saved org. jsforce refreshes the access token automatically
  * when it expires, and the new token is written back to the store.
  */
@@ -199,6 +213,7 @@ module.exports = {
   resolveClientId,
   startLogin,
   finishLogin,
+  browserLogin,
   saveLogin,
   connect
 };

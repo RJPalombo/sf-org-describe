@@ -62,18 +62,33 @@ async function login() {
 
   options.setDefault = !store.getDefaultOrg() || (await ask('Make this the default org? (y/n)', 'n')).toLowerCase().startsWith('y');
 
-  const started = await auth.startLogin(alias, options);
-  console.log(`\n  1. Open ${started.verificationUri}\n  2. Enter code: ${started.userCode}\n\nWaiting for approval...`);
-  try {
-    const { default: open } = await import('open');
-    await open(started.verificationUri);
-  } catch (e) {}
+  const method = await choose('How do you want to log in?', [
+    { label: 'Device code (enter a code in the browser)', value: 'device' },
+    { label: 'Browser login (for apps that require PKCE)', value: 'browser' }
+  ]);
 
-  const result = await auth.finishLogin(alias);
+  const openUrl = async (url) => {
+    try {
+      const { default: open } = await import('open');
+      await open(url);
+    } catch (e) {}
+  };
+
+  let result;
+  if (method === 'browser') {
+    console.log('\nLog in in the browser window that opens. Waiting for Salesforce to redirect back...');
+    result = await auth.browserLogin(alias, { ...options, openUrl });
+  } else {
+    const started = await auth.startLogin(alias, options);
+    console.log(`\n  1. Open ${started.verificationUri}\n  2. Enter code: ${started.userCode}\n\nWaiting for approval...`);
+    await openUrl(started.verificationUri);
+    result = await auth.finishLogin(alias);
+  }
   console.log(`Logged in as ${result.username}, saved as "${alias}"`);
   if (result.warning) console.log(`Warning: ${result.warning}`);
 
   showCommand(['login', '--alias', quote(alias),
+    method === 'browser' && '--browser',
     options.sandbox && '--sandbox',
     options.domain && `--domain ${quote(options.domain)}`,
     options.clientId && `--client-id ${quote(options.clientId)}`,

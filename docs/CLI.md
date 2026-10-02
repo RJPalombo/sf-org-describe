@@ -75,6 +75,7 @@ sfod login --alias <name> [--domain <my-domain> | --sandbox] [--client-id <key>]
 | `--sandbox` | Log in through `test.salesforce.com` |
 | `-c, --client-id` | Consumer Key of your Connected App or External Client App |
 | `-s, --set-default` | Use this org when `--target-org` is not given |
+| `--browser` | Log in through the browser (web server flow + PKCE) instead of entering a device code. Needed for External Client Apps that require PKCE. The app needs `http://localhost:1717/OAuthRedirect` as a callback URL. |
 | `--no-browser` | Print the URL but don't open a browser |
 | `--no-wait` / `--resume` | Split the login into two steps (see [Automation and agents](#automation-and-agents)) |
 
@@ -353,8 +354,10 @@ Saved orgs and shared defaults are kept in `~/.sf-org-describe/orgs.json`, which
 | --- | --- |
 | `client identifier invalid (invalid_client_id)` | Salesforce at that domain doesn't recognize the Client ID. Check that you chose the right `--domain` or `--sandbox`. External Client Apps only work through the My Domain of the org where they were created. |
 | `device flow is not enabled for the app` | In the app's OAuth settings, enable **Device Flow**, then wait about 10 minutes. |
-| `OAUTH_APPROVAL_ERROR_GENERIC` in the browser | Usually an External Client App used through `login.salesforce.com` or `test.salesforce.com`; log in with `--domain yourdomain.my.salesforce.com` instead. If you already use your My Domain, check the app's policies: your user must be permitted (profile or permission set if "Admin approved users are pre-authorized"), **Require PKCE** and **Require secret** options must be off (the device flow can't send either), and IP relaxation must allow your network. Approval failures don't appear in Login History. |
+| `OAUTH_APPROVAL_ERROR_GENERIC` in the browser | Look at the browser's address bar for the real error. If it's `missing required code challenge`, the app requires PKCE, which the device flow can't send. Log in with `--browser` instead; the app needs the Authorization Code and Credentials Flow enabled, `http://localhost:1717/OAuthRedirect` as a callback URL, and "Require secret for Web Server Flow" unchecked. Otherwise it's usually an External Client App used through `login.salesforce.com` or `test.salesforce.com`; log in with `--domain yourdomain.my.salesforce.com` instead. Approval failures don't appear in Login History. |
 | `The saved login is no longer valid` | The refresh token was revoked or expired. Run `sfod login --alias <alias>` again; the saved domain and Client ID are reused. |
 | `Salesforce did not return a refresh token` | Add the `refresh_token` (or `refresh_token, offline_access`) OAuth scope to the Connected App. |
+| `redirect_uri_mismatch` (browser login) | Add `http://localhost:1717/OAuthRedirect` as a Callback URL in the app's OAuth Settings, then wait a few minutes. |
+| `Port 1717 is in use` | Another login (or the Salesforce CLI) is waiting on that port. Finish or close it and try again. |
 | `Object not found in this org: X` | Check the API name with `sfod objects -o <alias> --match "X*"`. |
 | `The login code ... expired` | You have about 10 minutes to approve a code. Start again with `sfod login --alias <alias>`. |

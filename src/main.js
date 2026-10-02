@@ -93,6 +93,19 @@ ipcMain.handle('auth:pollDeviceFlow', async (event, deviceCode, loginUrl, alias)
   }
 });
 
+// Browser login (web server flow + PKCE) for apps that require PKCE; resolves after the redirect
+ipcMain.handle('auth:browserLogin', async (event, loginUrl, alias) => {
+  try {
+    applySharedClientId();
+    const clientId = salesforce.getClientIdInfo().clientId;
+    const orgInfo = await salesforce.browserLogin(loginUrl, { openUrl: (url) => shell.openExternal(url) });
+    const result = orgAuth.saveLogin(alias || orgInfo.username, orgInfo, { loginUrl, clientId });
+    return { success: true, data: result };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
 // Disconnect from org
 ipcMain.handle('auth:disconnect', async () => {
   salesforce.disconnect();

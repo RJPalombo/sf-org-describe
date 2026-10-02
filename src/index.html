@@ -508,6 +508,27 @@
       cursor: not-allowed;
     }
 
+    .browser-login {
+      margin-top: 14px;
+      font-size: 13px;
+      color: var(--text-secondary);
+    }
+
+    .browser-login-btn {
+      background: none;
+      border: none;
+      padding: 0;
+      color: var(--accent-hover);
+      font-size: 13px;
+      text-decoration: underline;
+      cursor: pointer;
+    }
+
+    .browser-login-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
     /* Auth error panel - stays put instead of vanishing like a toast */
     .auth-error {
       margin-top: 24px;
@@ -1382,6 +1403,11 @@
 
             <button class="connect-btn" id="connectBtn">Connect to Salesforce</button>
 
+            <div class="browser-login" id="browserLogin">
+              App requires PKCE ("missing required code challenge")?
+              <button class="browser-login-btn" id="browserLoginBtn">Log in with browser instead</button>
+            </div>
+
             <div class="device-flow-info hidden" id="deviceFlowInfo">
               <h3>Complete Authentication</h3>
               <p>Enter this code on the Salesforce login page:</p>
@@ -1719,6 +1745,7 @@
     const statusText = document.getElementById('statusText');
     const disconnectBtn = document.getElementById('disconnectBtn');
     const connectBtn = document.getElementById('connectBtn');
+    const browserLoginBtn = document.getElementById('browserLoginBtn');
     const deviceFlowInfo = document.getElementById('deviceFlowInfo');
     const userCodeEl = document.getElementById('userCode');
     const openBrowserBtn = document.getElementById('openBrowserBtn');
@@ -1935,6 +1962,7 @@
 
     // Connect button
     connectBtn.addEventListener('click', startAuth);
+    browserLoginBtn.addEventListener('click', startBrowserLogin);
 
     // Disconnect button
     disconnectBtn.addEventListener('click', async () => {
@@ -2067,6 +2095,44 @@
       }
 
       hideLoading();
+    }
+
+    // Browser login (web server flow + PKCE): resolves once Salesforce redirects back to localhost
+    async function startBrowserLogin() {
+      clearAuthError();
+
+      const loginUrl = resolveLoginUrl();
+      if (!loginUrl) {
+        showToast('Enter your My Domain URL, e.g. yourdomain.my.salesforce.com', 'error');
+        customDomainInput.focus();
+        return;
+      }
+
+      connectBtn.disabled = true;
+      browserLoginBtn.disabled = true;
+      browserLoginBtn.textContent = 'Waiting for you to log in in your browser…';
+
+      try {
+        const result = await window.api.browserLogin(loginUrl, aliasInput.value.trim() || null);
+        if (result.success) {
+          updateConnectionStatus(true, result.data);
+          loadObjects();
+          renderSavedOrgs();
+          showToast(`Saved as "${result.data.alias}"`, 'success');
+          if (result.data.warning) showAuthError(result.data.warning);
+        } else {
+          logError('Browser login', { message: result.error });
+          showAuthError(result.error);
+          showToast('Login failed - see details below', 'error');
+        }
+      } catch (error) {
+        logError('Browser login exception', error);
+        showAuthError(error.message);
+      }
+
+      connectBtn.disabled = false;
+      browserLoginBtn.disabled = false;
+      browserLoginBtn.textContent = 'Log in with browser instead';
     }
 
     // Poll for auth completion

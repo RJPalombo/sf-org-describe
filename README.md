@@ -80,6 +80,12 @@ To use this application, you need a Salesforce Connected App with Device Flow en
 
 External Client Apps also work (enable **Device Flow** under OAuth Settings → Flow Enablement), with one difference: a local External Client App only works in the org it was created in, and Salesforce must approve it through that org's My Domain. On the Connect tab, choose **Custom Domain** and enter your My Domain (e.g. `yourdomain.my.salesforce.com`). Logging in through Production or Sandbox fails after login with `OAUTH_APPROVAL_ERROR_GENERIC`.
 
+If the app requires PKCE, device flow approval fails with `OAUTH_APPROVAL_ERROR_GENERIC` and `missing required code challenge` in the address bar. Use browser login instead (**Log in with browser instead** on the Connect tab, or `sfod login --browser`). In the app's OAuth Settings:
+
+- Enable **Authorization Code and Credentials Flow**
+- Add `http://localhost:1717/OAuthRedirect` as a **Callback URL**
+- Uncheck **Require secret for Web Server Flow**
+
 ## Building Distributables
 
 Build for your platform:

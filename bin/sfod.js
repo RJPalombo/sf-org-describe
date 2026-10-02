@@ -54,6 +54,9 @@ alias, so "sfod login --alias <name>" later reuses them.
       --sandbox            Log in via test.salesforce.com
   -c, --client-id <id>     Connected App / External Client App Consumer Key
   -s, --set-default        Make this the default org
+      --browser            Log in through the browser (web server flow + PKCE) instead of
+                           the device flow. Needed for External Client Apps that require
+                           PKCE; add http://localhost:1717/OAuthRedirect as a callback URL
       --no-browser         Don't open the browser automatically
       --no-wait            Print the code and exit; finish later with --resume (for agents)
       --resume             Wait for a login started with --no-wait to be approved
@@ -110,6 +113,7 @@ const OPTIONS = {
   'set-default': { type: 'boolean', short: 's' },
   'no-browser': { type: 'boolean' },
   'no-wait': { type: 'boolean' },
+  browser: { type: 'boolean' },
   resume: { type: 'boolean' },
   objects: { type: 'string', multiple: true },
   'objects-file': { type: 'string' },
@@ -165,6 +169,24 @@ async function openBrowser(url) {
 async function runLogin(flags) {
   if (!flags.alias) throw commands.usageError('--alias is required, e.g. sfod login --alias prod');
   const alias = flags.alias;
+
+  if (flags.browser) {
+    info('Log in in the browser window that opens. Waiting for Salesforce to redirect back...');
+    const result = await auth.browserLogin(alias, {
+      domain: flags.domain || flags.instanceUrl,
+      sandbox: flags.sandbox,
+      clientId: flags.clientId,
+      setDefault: flags.setDefault,
+      openUrl: (url) => {
+        info(`If it doesn't open, go to:\n  ${url}\n`);
+        return flags.noBrowser ? null : openBrowser(url);
+      }
+    });
+    if (flags.json) return result;
+    info(`\nLogged in as ${result.username} (${result.instanceUrl}), saved as "${alias}"${store.getDefaultOrg() === alias ? ' [default]' : ''}`);
+    if (result.warning) info(`Warning: ${result.warning}`);
+    return null;
+  }
 
   if (!flags.resume) {
     const started = await auth.startLogin(alias, {
