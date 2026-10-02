@@ -88,10 +88,12 @@ let orgInfo = null;
  */
 async function startDeviceFlow(loginUrl = 'https://login.salesforce.com') {
   return new Promise((resolve, reject) => {
+    // No scope parameter: Salesforce grants the app's configured scopes. Requesting
+    // a scope the app doesn't have fails on the approval page with the unhelpful
+    // OAUTH_APPROVAL_ERROR_GENERIC instead of an invalid_scope error here.
     const postData = new URLSearchParams({
       response_type: 'device_code',
-      client_id: getClientId(),
-      scope: 'api refresh_token'
+      client_id: getClientId()
     }).toString();
 
     const url = new URL(loginUrl);

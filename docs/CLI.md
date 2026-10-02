@@ -353,7 +353,7 @@ Saved orgs and shared defaults are kept in `~/.sf-org-describe/orgs.json`, which
 | --- | --- |
 | `client identifier invalid (invalid_client_id)` | Salesforce at that domain doesn't recognize the Client ID. Check that you chose the right `--domain` or `--sandbox`. External Client Apps only work through the My Domain of the org where they were created. |
 | `device flow is not enabled for the app` | In the app's OAuth settings, enable **Device Flow**, then wait about 10 minutes. |
-| `OAUTH_APPROVAL_ERROR_GENERIC` in the browser | You're using an External Client App through `login.salesforce.com` or `test.salesforce.com`. Log in with `--domain yourdomain.my.salesforce.com` instead. |
+| `OAUTH_APPROVAL_ERROR_GENERIC` in the browser | Usually an External Client App used through `login.salesforce.com` or `test.salesforce.com`; log in with `--domain yourdomain.my.salesforce.com` instead. If you already use your My Domain, check the app's policies: your user must be permitted (profile or permission set if "Admin approved users are pre-authorized"), **Require PKCE** and **Require secret** options must be off (the device flow can't send either), and IP relaxation must allow your network. Approval failures don't appear in Login History. |
 | `The saved login is no longer valid` | The refresh token was revoked or expired. Run `sfod login --alias <alias>` again; the saved domain and Client ID are reused. |
 | `Salesforce did not return a refresh token` | Add the `refresh_token` (or `refresh_token, offline_access`) OAuth scope to the Connected App. |
 | `Object not found in this org: X` | Check the API name with `sfod objects -o <alias> --match "X*"`. |
